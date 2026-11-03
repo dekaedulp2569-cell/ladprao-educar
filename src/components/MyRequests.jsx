@@ -1,26 +1,38 @@
 import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
-import { APPROVAL_TYPE, formatDate, formatDateTimeRange, formatTime } from '../lib/helpers'
+import { APPROVAL_TYPE, formatDateTimeRange } from '../lib/helpers'
 import { Card, EmptyState, SectionTitle, Spinner, StatusBadge } from './ui'
+import { OfficialCarFormModal } from './OfficialCarFormModal'
 
 export function MyRequests() {
   const { session } = useAuth()
   const [requests, setRequests] = useState([])
+  const [cars, setCars] = useState([])
+  const [drivers, setDrivers] = useState([])
+  const [printRequest, setPrintRequest] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
   useEffect(() => {
     const load = async () => {
       setLoading(true)
-      const { data, error: loadError } = await supabase
-        .from('car_requests')
-        .select('*')
-        .eq('requester_name', session?.name || '')
-        .order('created_at', { ascending: false })
+      const [{ data: reqData, error: loadError }, { data: carData }, { data: driverData }] = await Promise.all([
+        supabase
+          .from('car_requests')
+          .select('*')
+          .eq('requester_name', session?.name || '')
+          .order('created_at', { ascending: false }),
+        supabase.from('cars').select('*'),
+        supabase.from('drivers').select('*'),
+      ])
 
       if (loadError) setError('ไม่สามารถโหลดรายการคำขอได้')
-      else setRequests(data || [])
+      else {
+        setRequests(reqData || [])
+        setCars(carData || [])
+        setDrivers(driverData || [])
+      }
       setLoading(false)
     }
     if (session?.name) load()
@@ -95,12 +107,36 @@ export function MyRequests() {
                       อนุมัติเรียบร้อยและล็อกคิวรถแล้ว
                     </p>
                   ) : null}
+                  <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-3">
+                    <span className="text-xs text-slate-400 font-mono">
+                      {request.doc_number || '-'}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const car = cars.find((c) => c.id === request.assigned_car_id)
+                        const driver = drivers.find((d) => d.id === request.assigned_driver_id)
+                        setPrintRequest({ request, car, driver })
+                      }}
+                      className="inline-flex items-center gap-1.5 rounded-lg bg-brand-50 px-3 py-1.5 text-xs font-semibold text-brand-700 transition hover:bg-brand-100"
+                    >
+                      📄 พิมพ์แบบ 3
+                    </button>
+                  </div>
                 </div>
               )
             })}
           </div>
         )}
       </Card>
+
+      <OfficialCarFormModal
+        open={Boolean(printRequest)}
+        onClose={() => setPrintRequest(null)}
+        request={printRequest?.request}
+        car={printRequest?.car}
+        driver={printRequest?.driver}
+      />
     </div>
   )
 }

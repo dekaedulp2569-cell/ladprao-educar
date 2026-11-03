@@ -6,7 +6,6 @@ import {
   dateKey,
   formatDate,
   formatDateTimeRange,
-  formatTime,
 } from '../lib/helpers'
 import { Card, EmptyState, SectionTitle, Spinner, StatusBadge } from './ui'
 

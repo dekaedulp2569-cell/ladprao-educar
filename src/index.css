@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 @theme {
-  --font-sans: "Noto Sans Thai", "Sarabun", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "Sarabun", "TH Sarabun New", "TH SarabunPSK", system-ui, sans-serif;
 
   --color-brand-50: #ecfdf5;
   --color-brand-100: #d1fae5;
@@ -17,14 +17,19 @@
 
 html {
   scroll-behavior: smooth;
+  font-family: "Sarabun", "TH Sarabun New", "TH SarabunPSK", system-ui, sans-serif;
 }
 
 body {
   margin: 0;
   background-color: #f8fafc;
   color: #1e293b;
-  font-family: "Noto Sans Thai", "Sarabun", ui-sans-serif, system-ui, sans-serif;
+  font-family: "Sarabun", "TH Sarabun New", "TH SarabunPSK", system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
+}
+
+button, input, select, textarea {
+  font-family: inherit;
 }
 
 /* ซ่อน scrollbar แนวนอนของตารางบนมือถือ */
@@ -35,8 +40,34 @@ body {
   scrollbar-width: none;
 }
 
+/* สไตล์การพิมพ์เอกสารราชการ (แบบ 3) */
+@page {
+  size: A4 portrait;
+  margin: 15mm 20mm 15mm 20mm;
+}
+
 @media print {
+  body {
+    background-color: #ffffff !important;
+    color: #000000 !important;
+    font-size: 15pt;
+  }
+
   .no-print {
     display: none !important;
+  }
+
+  .print-only {
+    display: block !important;
+  }
+
+  .printable-document {
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    box-shadow: none !important;
+    border: none !important;
+    background: transparent !important;
   }
 }

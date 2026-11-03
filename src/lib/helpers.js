@@ -93,12 +93,12 @@ export function isOutOfBkk(province) {
   return province !== 'กรุงเทพมหานคร'
 }
 
-const THAI_MONTHS_SHORT = [
+export const THAI_MONTHS_SHORT = [
   'ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.',
   'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.',
 ]
 
-const THAI_MONTHS_LONG = [
+export const THAI_MONTHS_LONG = [
   'มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน',
   'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม',
 ]
@@ -118,7 +118,7 @@ const BKK_TIME_FORMAT = new Intl.DateTimeFormat('en-GB', {
 })
 
 /** แปลงวันที่เป็นส่วนประกอบตามเวลาไทย (พ.ศ.) */
-function bangkokParts(value) {
+export function bangkokParts(value) {
   if (!value) return null
   const date = value instanceof Date ? value : new Date(value)
   if (Number.isNaN(date.getTime())) return null

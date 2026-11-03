@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import {
+  APPROVAL_TYPE,
   CAR_TYPE,
   STATUS,
   classNames,
@@ -10,6 +11,7 @@ import {
   monthLabel,
 } from '../lib/helpers'
 import { Card, EmptyState, SectionTitle, Spinner } from './ui'
+import { OfficialCarFormModal } from './OfficialCarFormModal'
 
 const WEEKDAYS = ['อา.', 'จ.', 'อ.', 'พ.', 'พฤ.', 'ศ.', 'ส.']
 
@@ -33,19 +35,22 @@ export function PublicCalendar() {
   const [carFilter, setCarFilter] = useState('all')
   const [requests, setRequests] = useState([])
   const [cars, setCars] = useState([])
+  const [drivers, setDrivers] = useState([])
+  const [printRequest, setPrintRequest] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
   const load = async () => {
     setLoading(true)
     setError('')
-    const [requestResult, carResult] = await Promise.all([
+    const [requestResult, carResult, driverResult] = await Promise.all([
       supabase
         .from('car_requests')
         .select('*')
         .in('status', ['approved', 'tentative'])
         .order('start_datetime', { ascending: true }),
       supabase.from('cars').select('*').order('created_at', { ascending: true }),
+      supabase.from('drivers').select('*').order('created_at', { ascending: true }),
     ])
 
     if (requestResult.error || carResult.error) {
@@ -53,6 +58,7 @@ export function PublicCalendar() {
     } else {
       setRequests(requestResult.data || [])
       setCars(carResult.data || [])
+      setDrivers(driverResult.data || [])
     }
     setLoading(false)
   }
@@ -66,6 +72,12 @@ export function PublicCalendar() {
     cars.forEach((car) => map.set(car.id, car))
     return map
   }, [cars])
+
+  const driverById = useMemo(() => {
+    const map = new Map()
+    drivers.forEach((driver) => map.set(driver.id, driver))
+    return map
+  }, [drivers])
 
   const filteredRequests = useMemo(() => {
     if (carFilter === 'all') return requests
@@ -301,7 +313,7 @@ export function PublicCalendar() {
       <Card className="p-4 sm:p-6">
         <SectionTitle
           title={`รายการใช้รถวันที่ ${formatDate(`${selectedKey}T12:00:00+07:00`, false)}`}
-          subtitle="แสดงเฉพาะรายการที่อนุมัติแล้วและรายการที่รอ ผอ.เขต อนุมัติ"
+          subtitle={`แสดงเฉพาะรายการที่อนุมัติแล้วและรอ ผอ.เขต (ทั้งหมด ${selectedEvents.length} รายการ)`}
         />
         {selectedEvents.length === 0 ? (
           <EmptyState
@@ -309,36 +321,106 @@ export function PublicCalendar() {
             description="รถทุกคันว่าง สามารถยื่นคำขอใช้รถได้ตามขั้นตอน"
           />
         ) : (
-          <div className="space-y-3">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
             {selectedEvents.map((event) => {
               const car = carById.get(event.assigned_car_id)
+              const driver = driverById.get(event.assigned_driver_id)
+              const approval = APPROVAL_TYPE[event.approval_type] || APPROVAL_TYPE.head_of_dept
+
               return (
                 <div
                   key={event.id}
-                  className="rounded-xl border border-slate-200 bg-slate-50/60 p-4"
+                  className="flex flex-col justify-between rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:border-brand-300 hover:shadow-md"
                 >
-                  <div className="flex flex-wrap items-start justify-between gap-2">
+                  <div className="space-y-3">
+                    {/* ส่วนหัว Card: เวลา และ สถานะ */}
+                    <div className="flex items-center justify-between gap-2 border-b border-slate-100 pb-3">
+                      <span className="inline-flex items-center gap-1.5 rounded-lg bg-brand-50 px-2.5 py-1 text-xs font-semibold text-brand-800">
+                        ⏰ {formatTime(event.start_datetime)} - {formatTime(event.end_datetime)} น.
+                      </span>
+                      <StatusBadgeInline status={event.status} />
+                    </div>
+
+                    {/* ปลายทาง และ จังหวัด */}
                     <div>
-                      <p className="text-sm font-semibold text-slate-800">
-                        {event.destination} · {event.destination_province}
-                      </p>
-                      <p className="mt-1 text-xs text-slate-500">
-                        {formatTime(event.start_datetime)} - {formatTime(event.end_datetime)} น. ·{' '}
-                        {event.requester_name}
+                      <h4 className="text-base font-bold text-slate-900 leading-snug">
+                        📍 {event.destination}
+                      </h4>
+                      <p className="mt-0.5 text-xs text-slate-500 font-medium">
+                        {event.destination_province || 'กรุงเทพมหานคร'}
                       </p>
                     </div>
-                    <StatusBadgeInline status={event.status} />
+
+                    {/* วัตถุประสงค์ */}
+                    {event.purpose ? (
+                      <div className="rounded-xl bg-slate-50 p-2.5 text-xs text-slate-700">
+                        <span className="font-semibold text-slate-800">วัตถุประสงค์: </span>
+                        <span>{event.purpose}</span>
+                      </div>
+                    ) : null}
+
+                    {/* รายละเอียดเพิ่มเติมในรูปแบบรายการแนวตั้ง */}
+                    <div className="space-y-1.5 text-xs text-slate-600">
+                      <div className="flex items-start gap-2">
+                        <span className="w-5 text-center text-slate-400">👤</span>
+                        <div className="flex-1">
+                          <span className="font-medium text-slate-800">{event.requester_name}</span>
+                          <span className="text-slate-400"> · {event.requester_position}</span>
+                        </div>
+                      </div>
+
+                      <div className="flex items-start gap-2">
+                        <span className="w-5 text-center text-slate-400">🏢</span>
+                        <span className="flex-1 text-slate-600 truncate">{event.requester_department}</span>
+                      </div>
+
+                      {event.phone ? (
+                        <div className="flex items-center gap-2">
+                          <span className="w-5 text-center text-slate-400">📞</span>
+                          <span className="text-slate-600">{event.phone}</span>
+                        </div>
+                      ) : null}
+
+                      <div className="flex items-center gap-2">
+                        <span className="w-5 text-center text-slate-400">👥</span>
+                        <span className="text-slate-700 font-medium">ผู้โดยสาร {event.passenger_count} คน</span>
+                      </div>
+
+                      <div className="flex items-start gap-2 pt-1 border-t border-slate-100">
+                        <span className="w-5 text-center text-slate-400">🚐</span>
+                        <div className="flex-1">
+                          <span className="font-semibold text-slate-800">
+                            {car ? `${car.license_plate} (${CAR_TYPE[car.car_type] || 'รถ'})` : event.external_car_info || 'ยังไม่ระบุรถ'}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="flex items-start gap-2">
+                        <span className="w-5 text-center text-slate-400">🧑‍✈️</span>
+                        <span className="flex-1 text-slate-700">
+                          {driver ? driver.full_name : event.external_driver_name || 'ยังไม่ระบุพนักงานขับรถ'}
+                        </span>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <span className="w-5 text-center text-slate-400">📄</span>
+                        <span className="text-slate-500 font-mono text-[11px]">{event.doc_number || '-'}</span>
+                      </div>
+                    </div>
                   </div>
-                  <div className="mt-3 flex flex-wrap gap-2 text-xs text-slate-600">
-                    <span className="rounded-lg bg-white px-2.5 py-1.5 ring-1 ring-slate-200">
-                      🚐 {car ? `${car.license_plate} (${CAR_TYPE[car.car_type] || 'รถ'})` : 'ยังไม่ระบุรถ'}
+
+                  {/* ปุ่มท้ายการ์ดสำหรับดู/พิมพ์แบบ 3 */}
+                  <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between gap-2">
+                    <span className="text-[11px] text-slate-400 truncate">
+                      {approval.label}
                     </span>
-                    <span className="rounded-lg bg-white px-2.5 py-1.5 ring-1 ring-slate-200">
-                      👥 {event.passenger_count} คน
-                    </span>
-                    <span className="rounded-lg bg-white px-2.5 py-1.5 ring-1 ring-slate-200">
-                      📄 {event.doc_number}
-                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setPrintRequest({ request: event, car, driver })}
+                      className="inline-flex items-center gap-1 rounded-lg bg-brand-50 px-2.5 py-1.5 text-xs font-semibold text-brand-700 transition hover:bg-brand-100 hover:text-brand-800"
+                    >
+                      📄 พิมพ์แบบ 3
+                    </button>
                   </div>
                 </div>
               )
@@ -346,6 +428,15 @@ export function PublicCalendar() {
           </div>
         )}
       </Card>
+
+      {/* Modal แบบ 3 ใบขออนุญาตใช้รถส่วนกลาง */}
+      <OfficialCarFormModal
+        open={Boolean(printRequest)}
+        onClose={() => setPrintRequest(null)}
+        request={printRequest?.request}
+        car={printRequest?.car}
+        driver={printRequest?.driver}
+      />
     </div>
   )
 }

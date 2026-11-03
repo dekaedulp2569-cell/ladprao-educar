@@ -13,11 +13,12 @@ import {
   fiscalYearRange,
   formatDate,
   formatDateTimeRange,
-  formatTime,
   overlaps,
 } from '../lib/helpers'
 import { PROVINCES } from '../lib/provinces'
 import { Alert, Card, EmptyState, Modal, SectionTitle, Spinner, StatusBadge } from './ui'
+import { OfficialCarFormModal } from './OfficialCarFormModal'
+import { MembersPanel } from './MembersPanel'
 
 const STATUS_TABS = [
   { value: 'all', label: 'ทั้งหมด' },
@@ -38,6 +39,7 @@ export function AdminDashboard() {
   const [statusFilter, setStatusFilter] = useState('all')
   const [search, setSearch] = useState('')
   const [selected, setSelected] = useState(null)
+  const [printRequest, setPrintRequest] = useState(null)
   const [busy, setBusy] = useState(false)
 
   const load = async () => {
@@ -268,6 +270,7 @@ export function AdminDashboard() {
         {[
           { value: 'requests', label: 'คำขอใช้รถ' },
           { value: 'resources', label: 'รถและคนขับ' },
+          { value: 'members', label: 'จัดการสมาชิก' },
           { value: 'reports', label: 'รายงานและจัดการข้อมูล' },
         ].map((item) => (
           <button
@@ -325,15 +328,20 @@ export function AdminDashboard() {
             <EmptyState title="ไม่พบรายการคำขอ" description="ลองเปลี่ยนตัวกรองสถานะหรือคำค้นหา" />
           ) : (
             <div className="grid gap-4 lg:grid-cols-2">
-              {filtered.map((request) => (
-                <RequestCard
-                  key={request.id}
-                  request={request}
-                  cars={cars}
-                  drivers={drivers}
-                  onOpen={() => setSelected(request)}
-                />
-              ))}
+              {filtered.map((request) => {
+                const car = cars.find((c) => c.id === request.assigned_car_id)
+                const driver = drivers.find((d) => d.id === request.assigned_driver_id)
+                return (
+                  <RequestCard
+                    key={request.id}
+                    request={request}
+                    cars={cars}
+                    drivers={drivers}
+                    onOpen={() => setSelected(request)}
+                    onPrint={() => setPrintRequest({ request, car, driver })}
+                  />
+                )
+              })}
             </div>
           )}
         </>
@@ -344,6 +352,8 @@ export function AdminDashboard() {
           onReload={load}
           onError={setError}
         />
+      ) : tab === 'members' ? (
+        <MembersPanel onError={setError} />
       ) : (
         <ReportsPanel
           requests={requests}
@@ -363,6 +373,19 @@ export function AdminDashboard() {
         onApprove={approve}
         onReject={reject}
         onSaveAllocation={saveAllocation}
+        onPrint={(req) => {
+          const car = cars.find((c) => c.id === req.assigned_car_id)
+          const driver = drivers.find((d) => d.id === req.assigned_driver_id)
+          setPrintRequest({ request: req, car, driver })
+        }}
+      />
+
+      <OfficialCarFormModal
+        open={Boolean(printRequest)}
+        onClose={() => setPrintRequest(null)}
+        request={printRequest?.request}
+        car={printRequest?.car}
+        driver={printRequest?.driver}
       />
     </div>
   )
@@ -383,7 +406,7 @@ function StatCard({ label, value, tone }) {
   )
 }
 
-function RequestCard({ request, cars, drivers, onOpen }) {
+function RequestCard({ request, cars, drivers, onOpen, onPrint }) {
   const car = cars.find((item) => item.id === request.assigned_car_id)
   const driver = drivers.find((item) => item.id === request.assigned_driver_id)
   const carLabel = car
@@ -424,19 +447,28 @@ function RequestCard({ request, cars, drivers, onOpen }) {
         <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] text-slate-600">
           {APPROVAL_TYPE[request.approval_type]?.label || 'รอตรวจสอบผู้อนุมัติ'}
         </span>
-        <button
-          type="button"
-          onClick={onOpen}
-          className="ml-auto rounded-lg bg-brand-700 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-brand-800"
-        >
-          จัดการคำขอ
-        </button>
+        <div className="ml-auto flex items-center gap-1.5">
+          <button
+            type="button"
+            onClick={onPrint}
+            className="rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-100"
+          >
+            📄 พิมพ์แบบ 3
+          </button>
+          <button
+            type="button"
+            onClick={onOpen}
+            className="rounded-lg bg-brand-700 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-brand-800"
+          >
+            จัดการคำขอ
+          </button>
+        </div>
       </div>
     </Card>
   )
 }
 
-function RequestDetail({ request, cars, drivers, busy, onClose, onApprove, onReject, onSaveAllocation }) {
+function RequestDetail({ request, cars, drivers, busy, onClose, onApprove, onReject, onSaveAllocation, onPrint }) {
   const [allocation, setAllocation] = useState({
     carMode: 'internal',
     carId: '',
@@ -472,13 +504,22 @@ function RequestDetail({ request, cars, drivers, busy, onClose, onApprove, onRej
   return (
     <Modal open={Boolean(request)} onClose={onClose} title="รายละเอียดคำขอใช้รถ" size="lg">
       <div className="space-y-5">
-        <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3">
           <div>
-            <p className="text-xs text-slate-400">{request.doc_number}</p>
+            <p className="text-xs text-slate-400 font-mono">{request.doc_number}</p>
             <h3 className="text-lg font-bold text-slate-800">{request.destination}</h3>
             <p className="text-sm text-slate-500">{request.destination_province}</p>
           </div>
-          <StatusBadge status={request.status} />
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => onPrint(request)}
+              className="inline-flex items-center gap-1.5 rounded-xl border border-brand-300 bg-brand-50 px-3 py-1.5 text-xs font-semibold text-brand-800 transition hover:bg-brand-100"
+            >
+              📄 พิมพ์แบบ 3 (ใบขอใช้รถ)
+            </button>
+            <StatusBadge status={request.status} />
+          </div>
         </div>
 
         <div className="grid gap-3 text-sm sm:grid-cols-2">
@@ -667,6 +708,21 @@ function ResourcesPanel({ cars, drivers, onReload, onError }) {
     dept: 'education',
     line_user_id: '',
   })
+  const [editingCar, setEditingCar] = useState(null)
+  const [editCarForm, setEditCarForm] = useState({
+    license_plate: '',
+    province: 'กรุงเทพมหานคร',
+    car_type: 'van',
+    owner_dept: 'education',
+  })
+  const [editingDriver, setEditingDriver] = useState(null)
+  const [editDriverForm, setEditDriverForm] = useState({
+    full_name: '',
+    nickname: '',
+    dept: 'education',
+    line_user_id: '',
+    is_active: true,
+  })
   const [busy, setBusy] = useState(false)
 
   const addCar = async (event) => {
@@ -683,6 +739,53 @@ function ResourcesPanel({ cars, drivers, onReload, onError }) {
       return
     }
     setCarForm({ license_plate: '', province: 'กรุงเทพมหานคร', car_type: 'van', owner_dept: 'education' })
+    onReload()
+  }
+
+  const startEditCar = (car) => {
+    setEditingCar(car)
+    setEditCarForm({
+      license_plate: car.license_plate,
+      province: car.province || 'กรุงเทพมหานคร',
+      car_type: car.car_type || 'van',
+      owner_dept: car.owner_dept || 'education',
+    })
+  }
+
+  const saveEditCar = async (event) => {
+    event.preventDefault()
+    if (!editingCar || !editCarForm.license_plate.trim()) return
+    setBusy(true)
+    const { error } = await supabase
+      .from('cars')
+      .update({
+        license_plate: editCarForm.license_plate.trim(),
+        province: editCarForm.province,
+        car_type: editCarForm.car_type,
+        owner_dept: editCarForm.owner_dept,
+      })
+      .eq('id', editingCar.id)
+    setBusy(false)
+    if (error) {
+      onError(`แก้ไขข้อมูลรถไม่สำเร็จ: ${error.message}`)
+      return
+    }
+    setEditingCar(null)
+    onReload()
+  }
+
+  const deleteCar = async (car) => {
+    const ok = window.confirm(
+      `ต้องการลบรถทะเบียน "${car.license_plate}" หรือไม่?\nรายการคำขอที่เคยผูกกับรถคันนี้จะไม่ถูกลบ แต่จะเปลี่ยนเป็นยังไม่ระบุรถ`,
+    )
+    if (!ok) return
+    setBusy(true)
+    const { error } = await supabase.from('cars').delete().eq('id', car.id)
+    setBusy(false)
+    if (error) {
+      onError(`ลบข้อมูลรถไม่สำเร็จ: ${error.message}`)
+      return
+    }
     onReload()
   }
 
@@ -705,6 +808,55 @@ function ResourcesPanel({ cars, drivers, onReload, onError }) {
     onReload()
   }
 
+  const startEditDriver = (driver) => {
+    setEditingDriver(driver)
+    setEditDriverForm({
+      full_name: driver.full_name,
+      nickname: driver.nickname || '',
+      dept: driver.dept || 'education',
+      line_user_id: driver.line_user_id || '',
+      is_active: Boolean(driver.is_active),
+    })
+  }
+
+  const saveEditDriver = async (event) => {
+    event.preventDefault()
+    if (!editingDriver || !editDriverForm.full_name.trim()) return
+    setBusy(true)
+    const { error } = await supabase
+      .from('drivers')
+      .update({
+        full_name: editDriverForm.full_name.trim(),
+        nickname: editDriverForm.nickname.trim() || null,
+        dept: editDriverForm.dept,
+        line_user_id: editDriverForm.line_user_id.trim() || null,
+        is_active: editDriverForm.is_active,
+      })
+      .eq('id', editingDriver.id)
+    setBusy(false)
+    if (error) {
+      onError(`แก้ไขข้อมูลคนขับไม่สำเร็จ: ${error.message}`)
+      return
+    }
+    setEditingDriver(null)
+    onReload()
+  }
+
+  const deleteDriver = async (driver) => {
+    const ok = window.confirm(
+      `ต้องการลบพนักงานขับรถ "${driver.full_name}" หรือไม่?\nรายการคำขอที่เคยผูกกับพนักงานขับรถคนนี้จะไม่ถูกลบ แต่จะเปลี่ยนเป็นยังไม่ระบุคนขับ`,
+    )
+    if (!ok) return
+    setBusy(true)
+    const { error } = await supabase.from('drivers').delete().eq('id', driver.id)
+    setBusy(false)
+    if (error) {
+      onError(`ลบพนักงานขับรถไม่สำเร็จ: ${error.message}`)
+      return
+    }
+    onReload()
+  }
+
   const toggleDriver = async (driver) => {
     setBusy(true)
     const { error } = await supabase
@@ -722,7 +874,7 @@ function ResourcesPanel({ cars, drivers, onReload, onError }) {
   return (
     <div className="grid gap-5 lg:grid-cols-2">
       <Card className="p-5">
-        <SectionTitle title="รถราชการในระบบ" subtitle={`ทั้งหมด ${cars.length} คัน`} />
+        <SectionTitle title="รถราชการในระบบ" subtitle={`ทั้งหมด ${cars.length} คัน (เพิ่ม / ลบ / แก้ไข ได้)`} />
         <div className="space-y-2">
           {cars.length === 0 ? (
             <p className="rounded-xl bg-slate-50 px-4 py-6 text-center text-sm text-slate-500">ยังไม่มีข้อมูลรถ</p>
@@ -730,25 +882,41 @@ function ResourcesPanel({ cars, drivers, onReload, onError }) {
             cars.map((car) => (
               <div
                 key={car.id}
-                className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 px-4 py-3"
+                className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 px-4 py-3 transition hover:border-slate-300"
               >
                 <div>
                   <p className="text-sm font-semibold text-slate-800">{car.license_plate}</p>
                   <p className="text-xs text-slate-500">
                     {CAR_TYPE[car.car_type] || 'รถ'} · {car.province} ·{' '}
-                    {car.owner_dept === 'education' ? 'รถฝ่ายเรา' : 'รถยืม'}
+                    {car.owner_dept === 'education' ? 'รถฝ่ายเรา' : 'รถยืมฝ่ายอื่น'}
                   </p>
                 </div>
-                <span className="text-2xl">🚐</span>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => startEditCar(car)}
+                    className="rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-700 transition hover:bg-slate-50"
+                  >
+                    ✏️ แก้ไข
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => deleteCar(car)}
+                    className="rounded-lg border border-rose-200 px-2.5 py-1 text-xs font-medium text-rose-600 transition hover:bg-rose-50"
+                  >
+                    🗑️ ลบ
+                  </button>
+                </div>
               </div>
             ))
           )}
         </div>
 
         <form onSubmit={addCar} className="mt-4 space-y-3 rounded-xl bg-brand-50/60 p-4">
-          <p className="text-sm font-semibold text-brand-800">เพิ่มรถใหม่</p>
+          <p className="text-sm font-semibold text-brand-800">➕ เพิ่มรถใหม่</p>
           <div className="grid grid-cols-2 gap-2">
             <input
+              required
               value={carForm.license_plate}
               onChange={(event) => setCarForm({ ...carForm, license_plate: event.target.value })}
               placeholder="เลขทะเบียน เช่น ฮว 4098"
@@ -794,7 +962,7 @@ function ResourcesPanel({ cars, drivers, onReload, onError }) {
       </Card>
 
       <Card className="p-5">
-        <SectionTitle title="พนักงานขับรถ" subtitle={`ทั้งหมด ${drivers.length} คน`} />
+        <SectionTitle title="พนักงานขับรถ" subtitle={`ทั้งหมด ${drivers.length} คน (เพิ่ม / ลบ / แก้ไข ได้)`} />
         <div className="space-y-2">
           {drivers.length === 0 ? (
             <p className="rounded-xl bg-slate-50 px-4 py-6 text-center text-sm text-slate-500">ยังไม่มีข้อมูลคนขับ</p>
@@ -802,7 +970,7 @@ function ResourcesPanel({ cars, drivers, onReload, onError }) {
             drivers.map((driver) => (
               <div
                 key={driver.id}
-                className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 px-4 py-3"
+                className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 px-4 py-3 transition hover:border-slate-300"
               >
                 <div>
                   <p className="text-sm font-semibold text-slate-800">
@@ -813,27 +981,44 @@ function ResourcesPanel({ cars, drivers, onReload, onError }) {
                     {driver.line_user_id ? 'ผูก LINE แล้ว' : 'ยังไม่ผูก LINE'}
                   </p>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => toggleDriver(driver)}
-                  disabled={busy}
-                  className={`rounded-lg px-2.5 py-1.5 text-xs font-medium ${
-                    driver.is_active
-                      ? 'bg-emerald-50 text-emerald-700'
-                      : 'bg-slate-100 text-slate-500'
-                  }`}
-                >
-                  {driver.is_active ? 'พร้อมปฏิบัติงาน' : 'ปิดใช้งาน'}
-                </button>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => toggleDriver(driver)}
+                    disabled={busy}
+                    className={`rounded-lg px-2 py-1 text-xs font-medium ${
+                      driver.is_active
+                        ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                        : 'bg-slate-100 text-slate-500 border border-slate-200'
+                    }`}
+                  >
+                    {driver.is_active ? 'พร้อม' : 'ปิด'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => startEditDriver(driver)}
+                    className="rounded-lg border border-slate-200 px-2 py-1 text-xs font-medium text-slate-700 transition hover:bg-slate-50"
+                  >
+                    ✏️
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => deleteDriver(driver)}
+                    className="rounded-lg border border-rose-200 px-2 py-1 text-xs font-medium text-rose-600 transition hover:bg-rose-50"
+                  >
+                    🗑️
+                  </button>
+                </div>
               </div>
             ))
           )}
         </div>
 
         <form onSubmit={addDriver} className="mt-4 space-y-3 rounded-xl bg-brand-50/60 p-4">
-          <p className="text-sm font-semibold text-brand-800">เพิ่มพนักงานขับรถ</p>
+          <p className="text-sm font-semibold text-brand-800">➕ เพิ่มพนักงานขับรถ</p>
           <div className="grid grid-cols-2 gap-2">
             <input
+              required
               value={driverForm.full_name}
               onChange={(event) => setDriverForm({ ...driverForm, full_name: event.target.value })}
               placeholder="ชื่อ-สกุล"
@@ -869,6 +1054,150 @@ function ResourcesPanel({ cars, drivers, onReload, onError }) {
           </button>
         </form>
       </Card>
+
+      {/* Modal แก้ไขข้อมูลรถ */}
+      <Modal open={Boolean(editingCar)} onClose={() => setEditingCar(null)} title="แก้ไขข้อมูลรถยนต์">
+        <form onSubmit={saveEditCar} className="space-y-4">
+          <div>
+            <label className="mb-1 block text-xs font-semibold text-slate-700">เลขทะเบียนรถ *</label>
+            <input
+              required
+              value={editCarForm.license_plate}
+              onChange={(e) => setEditCarForm({ ...editCarForm, license_plate: e.target.value })}
+              className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm outline-none focus:border-brand-500"
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="mb-1 block text-xs font-semibold text-slate-700">ประเภทรถ</label>
+              <select
+                value={editCarForm.car_type}
+                onChange={(e) => setEditCarForm({ ...editCarForm, car_type: e.target.value })}
+                className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-brand-500"
+              >
+                <option value="van">รถตู้</option>
+                <option value="pickup">รถกระบะ</option>
+                <option value="other">อื่น ๆ</option>
+              </select>
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-semibold text-slate-700">สังกัดรถ</label>
+              <select
+                value={editCarForm.owner_dept}
+                onChange={(e) => setEditCarForm({ ...editCarForm, owner_dept: e.target.value })}
+                className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-brand-500"
+              >
+                <option value="education">รถฝ่ายเรา</option>
+                <option value="external">รถยืมฝ่ายอื่น</option>
+              </select>
+            </div>
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-semibold text-slate-700">จังหวัดป้ายทะเบียน</label>
+            <input
+              list="car-province-edit-list"
+              value={editCarForm.province}
+              onChange={(e) => setEditCarForm({ ...editCarForm, province: e.target.value })}
+              className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm outline-none focus:border-brand-500"
+            />
+            <datalist id="car-province-edit-list">
+              {PROVINCES.map((province) => (
+                <option key={province} value={province} />
+              ))}
+            </datalist>
+          </div>
+          <div className="flex justify-end gap-2 border-t border-slate-200 pt-3">
+            <button
+              type="button"
+              onClick={() => setEditingCar(null)}
+              className="rounded-xl border border-slate-300 px-4 py-2 text-xs font-semibold text-slate-600 transition hover:bg-slate-50"
+            >
+              ยกเลิก
+            </button>
+            <button
+              type="submit"
+              disabled={busy}
+              className="rounded-xl bg-brand-700 px-4 py-2 text-xs font-semibold text-white transition hover:bg-brand-800 disabled:opacity-60"
+            >
+              บันทึกการแก้ไข
+            </button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Modal แก้ไขข้อมูลพนักงานขับรถ */}
+      <Modal open={Boolean(editingDriver)} onClose={() => setEditingDriver(null)} title="แก้ไขข้อมูลพนักงานขับรถ">
+        <form onSubmit={saveEditDriver} className="space-y-4">
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="mb-1 block text-xs font-semibold text-slate-700">ชื่อ-สกุล *</label>
+              <input
+                required
+                value={editDriverForm.full_name}
+                onChange={(e) => setEditDriverForm({ ...editDriverForm, full_name: e.target.value })}
+                className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm outline-none focus:border-brand-500"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-semibold text-slate-700">ชื่อเล่น</label>
+              <input
+                value={editDriverForm.nickname}
+                onChange={(e) => setEditDriverForm({ ...editDriverForm, nickname: e.target.value })}
+                className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm outline-none focus:border-brand-500"
+              />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="mb-1 block text-xs font-semibold text-slate-700">สังกัดคนขับ</label>
+              <select
+                value={editDriverForm.dept}
+                onChange={(e) => setEditDriverForm({ ...editDriverForm, dept: e.target.value })}
+                className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-brand-500"
+              >
+                <option value="education">คนขับฝ่ายเรา</option>
+                <option value="external">คนขับฝ่ายอื่น</option>
+              </select>
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-semibold text-slate-700">สถานะความพร้อม</label>
+              <select
+                value={editDriverForm.is_active ? 'active' : 'inactive'}
+                onChange={(e) => setEditDriverForm({ ...editDriverForm, is_active: e.target.value === 'active' })}
+                className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-brand-500"
+              >
+                <option value="active">พร้อมปฏิบัติงาน</option>
+                <option value="inactive">ปิดใช้งานชั่วคราว</option>
+              </select>
+            </div>
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-semibold text-slate-700">LINE User ID (สำหรับแจ้งเตือน)</label>
+            <input
+              value={editDriverForm.line_user_id}
+              onChange={(e) => setEditDriverForm({ ...editDriverForm, line_user_id: e.target.value })}
+              placeholder="U1234567890abcdef"
+              className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm outline-none focus:border-brand-500"
+            />
+          </div>
+          <div className="flex justify-end gap-2 border-t border-slate-200 pt-3">
+            <button
+              type="button"
+              onClick={() => setEditingDriver(null)}
+              className="rounded-xl border border-slate-300 px-4 py-2 text-xs font-semibold text-slate-600 transition hover:bg-slate-50"
+            >
+              ยกเลิก
+            </button>
+            <button
+              type="submit"
+              disabled={busy}
+              className="rounded-xl bg-brand-700 px-4 py-2 text-xs font-semibold text-white transition hover:bg-brand-800 disabled:opacity-60"
+            >
+              บันทึกการแก้ไข
+            </button>
+          </div>
+        </form>
+      </Modal>
     </div>
   )
 }
