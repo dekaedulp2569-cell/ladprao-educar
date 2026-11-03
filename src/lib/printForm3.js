@@ -309,7 +309,6 @@ export function generateForm3Html(request, car, driver, recipient) {
 
     .signature-date-spacer {
       display: inline-block;
-      width: 5ch;
     }
 
     .signature-date-rule {
@@ -426,8 +425,8 @@ export function generateForm3Html(request, car, driver, recipient) {
       </p>
       <p class="signature-date">
         <span class="signature-date-rule">
-          <span>/</span><span class="signature-date-spacer"></span><span>/</span>
-          <span class="signature-date-spacer"></span>
+          <span>/</span><span class="signature-date-spacer">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span><span>/</span>
+          <span class="signature-date-spacer">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span>
         </span>
         <span class="signature-date-label">(วัน เดือน ปี)</span>
       </p>
@@ -441,8 +440,8 @@ export function generateForm3Html(request, car, driver, recipient) {
       </p>
       <p class="signature-date">
         <span class="signature-date-rule">
-          <span>/</span><span class="signature-date-spacer"></span><span>/</span>
-          <span class="signature-date-spacer"></span>
+          <span>/</span><span class="signature-date-spacer">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span><span>/</span>
+          <span class="signature-date-spacer">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span>
         </span>
         <span class="signature-date-label">(วัน เดือน ปี)</span>
       </p>
