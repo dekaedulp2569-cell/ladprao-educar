@@ -125,7 +125,7 @@ Deno.serve(async (req) => {
     }
     email = authUser.user.email
   } else {
-    const passwordBytes = crypto.getRandomValues(new Uint8Array(48))
+    const passwordBytes = crypto.getRandomValues(new Uint8Array(32))
     const password = Array.from(passwordBytes, (byte) => byte.toString(16).padStart(2, '0')).join('')
     const { data: createdUser, error: createUserError } = await admin.auth.admin.createUser({
       email,
