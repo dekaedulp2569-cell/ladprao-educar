@@ -66,7 +66,25 @@ Deno.serve(async (req) => {
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({ id_token: idToken, client_id: lineChannelId }),
     })
-    if (!verification.ok) return json({ error: 'LINE ปฏิเสธการยืนยันตัวตน' }, 401, corsHeaders)
+    if (!verification.ok) {
+      const errorBody = await verification.json().catch(() => null)
+      const errorCode = typeof errorBody?.error === 'string' ? errorBody.error : 'unknown'
+      const errorDescription =
+        typeof errorBody?.error_description === 'string' ? errorBody.error_description : 'unknown'
+      console.error('LINE ID token verification rejected', {
+        status: verification.status,
+        error: errorCode,
+        description: errorDescription,
+      })
+      return json(
+        {
+          error:
+            'LINE ปฏิเสธ ID token กรุณาตรวจว่า LINE_LOGIN_CHANNEL_ID ตรงกับ Channel ID ของ LIFF และเปิด scope openid แล้วเริ่ม Login ใหม่',
+        },
+        401,
+        corsHeaders,
+      )
+    }
     identity = await verification.json()
   } catch {
     return json({ error: 'ติดต่อบริการยืนยันตัวตน LINE ไม่สำเร็จ' }, 502, corsHeaders)
