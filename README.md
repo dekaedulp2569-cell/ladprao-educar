@@ -49,9 +49,10 @@ npm run lint     # ตรวจโค้ดด้วย oxlint
 ```
 VITE_SUPABASE_URL=https://<project-ref>.supabase.co
 VITE_SUPABASE_ANON_KEY=<anon public key>
+VITE_LINE_LIFF_ID=<LIFF ID>
 ```
 
-> `anon key` เป็นกุญแจสาธารณะ ใช้ฝังใน frontend ได้ แต่ความปลอดภัยของข้อมูลต้องอาศัย RLS (ดูหัวข้อข้อจำกัด)
+> `anon key` และ LIFF ID เป็นค่าที่เปิดเผยได้ แต่ห้ามใส่ Channel secret, Channel access token หรือ Supabase service role key ใน frontend
 
 ## โครงสร้างโปรเจกต์
 
@@ -64,23 +65,71 @@ src/
     MyRequests.jsx           # คำขอของฉัน
     AdminDashboard.jsx       # แดชบอร์ดจัดการคำขอ/รถ/คนขับ/รายงาน
     DriverSchedule.jsx       # ตารางงานพนักงานขับรถ
-    LoginModal.jsx           # Login แบบเลือกบทบาท (Demo)
+    LoginModal.jsx           # เข้าสู่ระบบผ่าน LINE LIFF
     ui.jsx                   # Modal/Badge/Card/Alert/Spinner
-  context/AuthContext.jsx    # session ใน localStorage
+  context/AuthContext.jsx    # Supabase Auth session และโปรไฟล์ที่อนุมัติแล้ว
   lib/
     supabase.js              # Supabase client
     helpers.js               # สถานะ/วันที่ไทย/ปีงบประมาณ/CSV/ตรวจเวลา
     line.js                  # เรียก Edge Function line-notify
+    lineAuth.js              # LIFF Login และสร้าง Supabase Auth session
     provinces.js             # 77 จังหวัด
 supabase/
+  functions/line-auth/      # ตรวจสอบ LINE ID token และออก Supabase session
   functions/line-notify/     # แจ้งเตือน LINE
   functions/daily-summary/   # สรุปงาน 16:30 น.
+  migrations/                # RLS และ schema สำหรับ LINE Login
   rls_demo.sql               # RLS โหมด Demo
   schema.sql                 # สร้างตาราง (อ้างอิง)
 .github/workflows/deploy.yml # Deploy GitHub Pages อัตโนมัติ
 ```
 
-## บทบาทผู้ใช้งาน (โหมด Demo)
+## LINE Login และการอนุมัติบัญชี
+
+ผู้ใช้เข้าสู่ระบบผ่าน LIFF; Edge Function `line-auth` ตรวจสอบ LINE ID token กับ LINE ก่อนเชื่อมบัญชี Supabase Auth โปรไฟล์ใหม่จะเริ่มเป็น `pending` และเข้าใช้งานส่วนที่ต้องยืนยันตัวตนไม่ได้จนกว่าผู้ดูแลจะอนุมัติ
+
+ก่อนเปิดระบบ ให้ดำเนินการใน Supabase:
+
+1. รัน `supabase/migrations/20261104000000_line_login_access.sql` ใน SQL Editor เพื่อเพิ่มคอลัมน์บัญชี/สถานะและจำกัด RLS (migration นี้ปิด Demo policies เดิม)
+2. ในโฟลเดอร์โปรเจกต์ รันคำสั่งต่อไปนี้ (ต้องติดตั้ง Supabase CLI และมีสิทธิ์โปรเจกต์):
+
+   ```powershell
+   supabase login
+   supabase link --project-ref ccflyjycsfwnpfgkhpoy
+   supabase secrets set LINE_LOGIN_CHANNEL_ID=2012159727
+   supabase functions deploy line-auth
+   supabase functions deploy line-notify
+   ```
+
+   `LINE_LOGIN_CHANNEL_ID` คือ ID ของ LINE Login channel ไม่ใช่ LIFF ID หรือ Messaging API token ตรวจว่า `supabase/config.toml` ถูกนำไปใช้ในการ deploy
+3. ตั้ง LIFF Endpoint URL เป็น `https://dekaedulp2569-cell.github.io/ladprao-educar/` พร้อม scope `openid` และ `profile`
+4. Push frontend ไป `main` เพื่อ deploy ผ่าน GitHub Actions แล้วให้บัญชีผู้ดูแลคนแรกลงชื่อเข้า LINE หนึ่งครั้ง ระบบจะสร้างโปรไฟล์ `pending`
+5. ตรวจสอบ LINE User ID ของผู้ดูแลคนแรกใน SQL Editor:
+
+   ```sql
+   select id, full_name, line_user_id, approval_status
+   from public.user_profiles
+   where approval_status = 'pending'
+   order by created_at desc;
+   ```
+
+   จากนั้นตรวจยืนยัน LINE User ID แล้วอนุมัติบัญชีผู้ดูแล:
+
+   ```sql
+   update public.user_profiles
+   set role = 'admin', approval_status = 'approved'
+   where line_user_id = '<LINE_USER_ID>';
+   ```
+
+6. ให้ผู้ดูแลกด “ตรวจสอบสถานะอีกครั้ง” แล้วตรวจ/อนุมัติสมาชิกใหม่จากเมนูจัดการสมาชิก
+
+บัญชีใหม่จะผูก LINE User ID อัตโนมัติ แต่ข้อมูลตำแหน่งและสังกัดต้องให้ผู้ดูแลแก้ไขก่อนหรือหลังอนุมัติ ห้ามส่ง Channel secret, Channel access token หรือ service role key ผ่านแชต/commit; ค่าเหล่านั้นต้องอยู่ใน Supabase Secrets เท่านั้น
+
+เนื่องจาก token เดิมถูกเพิกถอนแล้ว หากยังใช้ LINE Messaging API แจ้งเตือน ให้สร้าง token ใหม่และแทนค่า `LINE_CHANNEL_ACCESS_TOKEN` ใน Supabase Secrets ด้วยตนเอง (ห้ามส่ง token ใหม่ให้ผม)
+
+คำขอเก่าก่อนเชื่อม LINE จะไม่มี `requester_auth_user_id` และจะแสดงให้ผู้ดูแลเท่านั้น ต้องตรวจสอบเอกสารแล้วผูกประวัติที่ถูกต้องด้วยตนเองก่อนให้ผู้ขอเห็นรายการย้อนหลัง
+
+## บทบาทผู้ใช้งาน
 
 | บทบาท | สิทธิ์ |
 |---|---|
@@ -89,7 +138,7 @@ supabase/
 | หัวหน้าฝ่ายการศึกษา (`head_of_dept`) | เข้าแดชบอร์ดจัดการและอนุมัติได้ |
 | พนักงานขับรถ (`driver`) | ดูตารางงานของตนเอง (เลือกชื่อจากตาราง `drivers`) |
 
-> **โหมด Demo:** ยังไม่เชื่อม LINE Login/Supabase Auth จึงใช้การเลือกบทบาท + ระบุชื่อ เก็บใน `localStorage` คีย์ `lp_edu_car_session` การป้องกันเป็นเพียงระดับ UI ไม่ใช่ความปลอดภัยจริง
+สิทธิ์จัดการข้อมูลตรวจสอบจากโปรไฟล์ที่อนุมัติแล้วในฐานข้อมูลและ RLS ไม่ได้เชื่อถือบทบาทจาก `localStorage`
 
 ## ฐานข้อมูล Supabase
 
@@ -97,7 +146,7 @@ supabase/
 
 - โปรเจกต์: `ccflyjycsfwnpfgkhpoy` (region `ap-south-1`)
 - สร้างตารางใหม่: รัน `supabase_schema.sql` ใน SQL Editor
-- เปิดสิทธิ์โหมด Demo: รัน `supabase/rls_demo.sql` (RLS แบบ permissive)
+- **ห้ามรัน** `supabase/rls_demo.sql` ใน production เพราะเป็น RLS แบบ permissive สำหรับ Demo เท่านั้น
 
 ข้อมูลเริ่มต้น: รถ 2 คัน (ฮว 4098 รถตู้, กข 1234 รถกระบะ) และพนักงานขับรถ 2 คน
 

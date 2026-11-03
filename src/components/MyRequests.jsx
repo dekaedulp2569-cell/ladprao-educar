@@ -22,10 +22,10 @@ export function MyRequests() {
         supabase
           .from('car_requests')
           .select('*')
-          .eq('requester_name', session?.name || '')
+          .eq('requester_auth_user_id', session?.userId || '')
           .order('created_at', { ascending: false }),
         supabase.from('cars').select('*'),
-        supabase.from('drivers').select('*'),
+        supabase.from('drivers').select('id, full_name, nickname, dept, is_active, created_at'),
       ])
 
       if (loadError) setError('ไม่สามารถโหลดรายการคำขอได้')
@@ -36,8 +36,8 @@ export function MyRequests() {
       }
       setLoading(false)
     }
-    if (session?.name) load()
-  }, [session?.name])
+    if (session?.userId) load()
+  }, [session?.userId])
 
   const summary = useMemo(() => {
     return requests.reduce(
@@ -57,7 +57,7 @@ export function MyRequests() {
         <p className="text-xs font-medium text-brand-700">ติดตามสถานะ</p>
         <h1 className="mt-1 text-2xl font-bold text-slate-800 sm:text-3xl">คำขอใช้รถของฉัน</h1>
         <p className="mt-1 text-sm text-slate-500">
-          แสดงรายการที่ลงชื่อผู้ขอเป็น {session?.name}
+          แสดงรายการคำขอที่ยื่นผ่านบัญชี {session?.name}
         </p>
       </div>
 

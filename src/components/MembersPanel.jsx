@@ -18,6 +18,7 @@ const emptyMemberForm = {
   phone: '',
   email: '',
   line_user_id: '',
+  approval_status: 'pending',
 }
 
 export function MembersPanel({ onError }) {
@@ -63,6 +64,7 @@ export function MembersPanel({ onError }) {
       position: addForm.position.trim() || ROLE[addForm.role],
       department: addForm.department.trim() || 'ฝ่ายการศึกษา สำนักงานเขตลาดพร้าว',
       role: addForm.role,
+      approval_status: 'approved',
       phone: addForm.phone.trim() || null,
       email: addForm.email.trim() || null,
       line_user_id: addForm.line_user_id.trim() || null,
@@ -92,6 +94,7 @@ export function MembersPanel({ onError }) {
       phone: member.phone || '',
       email: member.email || '',
       line_user_id: member.line_user_id || '',
+      approval_status: member.approval_status || 'approved',
     })
   }
 
@@ -105,6 +108,7 @@ export function MembersPanel({ onError }) {
       position: editForm.position.trim() || ROLE[editForm.role],
       department: editForm.department.trim() || 'ฝ่ายการศึกษา สำนักงานเขตลาดพร้าว',
       role: editForm.role,
+      approval_status: editForm.approval_status,
       phone: editForm.phone.trim() || null,
       email: editForm.email.trim() || null,
       line_user_id: editForm.line_user_id.trim() || null,
@@ -145,49 +149,6 @@ export function MembersPanel({ onError }) {
     loadMembers()
   }
 
-  // เพิ่มข้อมูลเริ่มต้น (Seed) เมื่อระบบยังไม่มีข้อมูล
-  const handleSeedDefaults = async () => {
-    setBusy(true)
-    const defaults = [
-      {
-        full_name: 'นายรัชชานนท์ ประจงกิจ',
-        position: 'เจ้าพนักงานธุรการปฏิบัติงาน',
-        department: 'ฝ่ายการศึกษา สำนักงานเขตลาดพร้าว',
-        role: 'admin',
-        phone: '081-234-5678',
-      },
-      {
-        full_name: 'นางสาวกานดา วิทยา',
-        position: 'หัวหน้าฝ่ายการศึกษา',
-        department: 'ฝ่ายการศึกษา สำนักงานเขตลาดพร้าว',
-        role: 'head_of_dept',
-        phone: '082-345-6789',
-      },
-      {
-        full_name: 'นายสิทธิชัย อนุกูล',
-        position: 'พนักงานขับรถยนต์',
-        department: 'ฝ่ายการศึกษา สำนักงานเขตลาดพร้าว',
-        role: 'driver',
-        phone: '083-456-7890',
-      },
-      {
-        full_name: 'นายสมชาย ใจดี',
-        position: 'นักวิชาการศึกษาปฏิบัติการ',
-        department: 'ฝ่ายการศึกษา สำนักงานเขตลาดพร้าว',
-        role: 'requester',
-        phone: '084-567-8901',
-      },
-    ]
-
-    const { error } = await supabase.from('user_profiles').insert(defaults)
-    setBusy(false)
-    if (error) {
-      if (onError) onError(`สร้างข้อมูลเริ่มต้นไม่สำเร็จ: ${error.message}`)
-    } else {
-      loadMembers()
-    }
-  }
-
   const filteredMembers = useMemo(() => {
     return members.filter((m) => {
       if (roleFilter !== 'all' && m.role !== roleFilter) return false
@@ -223,16 +184,6 @@ export function MembersPanel({ onError }) {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          {members.length === 0 ? (
-            <button
-              type="button"
-              onClick={handleSeedDefaults}
-              disabled={busy}
-              className="rounded-xl border border-brand-300 bg-brand-50 px-3.5 py-2 text-xs font-semibold text-brand-800 transition hover:bg-brand-100"
-            >
-              🌱 นำเข้าสมาชิกตัวอย่างเริ่มต้น
-            </button>
-          ) : null}
           <button
             type="button"
             onClick={() => setAddModalOpen(true)}
@@ -303,6 +254,13 @@ export function MembersPanel({ onError }) {
                   </div>
 
                   <div className="space-y-1 text-xs text-slate-600">
+                    <p className={member.approval_status === 'approved' ? 'text-emerald-700' : 'font-semibold text-amber-700'}>
+                      {member.approval_status === 'approved'
+                        ? '✓ อนุมัติแล้ว'
+                        : member.approval_status === 'rejected'
+                          ? 'บัญชีถูกปฏิเสธ'
+                          : '⏳ รออนุมัติ'}
+                    </p>
                     <p className="truncate">🏢 {member.department}</p>
                     {member.phone ? <p>📞 {member.phone}</p> : null}
                     {member.email ? <p className="truncate">✉️ {member.email}</p> : null}
@@ -469,6 +427,19 @@ export function MembersPanel({ onError }) {
                 <option value="driver">พนักงานขับรถ (Driver)</option>
               </select>
             </div>
+          </div>
+
+          <div>
+            <label className="mb-1 block text-xs font-semibold text-slate-700">สถานะบัญชี LINE</label>
+            <select
+              value={editForm.approval_status}
+              onChange={(e) => setEditForm({ ...editForm, approval_status: e.target.value })}
+              className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-100"
+            >
+              <option value="pending">รออนุมัติ</option>
+              <option value="approved">อนุมัติให้เข้าใช้</option>
+              <option value="rejected">ปฏิเสธ</option>
+            </select>
           </div>
 
           <div>

@@ -4,6 +4,7 @@
 
 | Function | หน้าที่ |
 |---|---|
+| `line-auth` | ตรวจ LINE ID token แล้วสร้าง Supabase Auth session และโปรไฟล์รออนุมัติ |
 | `line-notify` | รับคำสั่งจากเว็บแอปแล้วส่งข้อความสถานะ/งานใหม่ผ่าน LINE |
 | `daily-summary` | สรุปงานของพนักงานขับรถวันถัดไป ส่งเวลา 16:30 น. (Asia/Bangkok) |
 
@@ -30,12 +31,18 @@ supabase secrets set \
 ```
 
 `SUPABASE_URL` และ `SUPABASE_SERVICE_ROLE_KEY` ถูก inject ให้ Edge Function อัตโนมัติ
+หากใช้ LINE Login ให้เพิ่ม `LINE_LOGIN_CHANNEL_ID` (เช่น `2012159727`) โดยไม่ใส่ LIFF ID หรือ Messaging API token:
+
+```bash
+supabase secrets set LINE_LOGIN_CHANNEL_ID=2012159727
+```
 
 ## 3. Deploy
 
 ```bash
 supabase functions deploy line-notify
 supabase functions deploy daily-summary
+supabase functions deploy line-auth
 ```
 
 ทดสอบเรียก:
@@ -87,8 +94,10 @@ select cron.unschedule('line-daily-summary');
 - **อนุมัติ/ไม่อนุมัติ** → ส่งสถานะเข้ากลุ่มกลาง
 - **16:30 น.** → `daily-summary` รวมงานวันถัดไป ส่งส่วนตัวให้คนขับฝ่ายเรา และสรุปงานฝ่ายอื่นเข้ากลุ่ม
 
-## 6. ความปลอดภัย
+## 6. LINE Login และความปลอดภัย
 
-- Edge Function ถูกเรียกด้วย anon key ซึ่งเป็นสาธารณะ จึงควรเพิ่มการตรวจ JWT ของผู้ใช้จริง (Supabase Auth) และ rate limiting ก่อนใช้งาน production
+- ตั้งค่า `LINE_LOGIN_CHANNEL_ID` แล้ว deploy `line-auth` เพื่อให้ฟังก์ชันตรวจ ID token กับ LINE ก่อนเชื่อมบัญชี
+- `line-notify` ต้องได้รับ Supabase Auth access token ของบัญชีที่อนุมัติแล้ว และตรวจสิทธิ์จาก request ที่บันทึกจริง
+- การส่งข้อความดิบหรือกำหนดผู้รับเองผ่าน `line-notify` ไม่อนุญาต
 - `daily-summary` ป้องกันด้วย `CRON_SECRET` ผ่าน header `x-cron-secret`
-- ห้ามใส่ Channel Access Token ใน frontend หรือ commit ลง repository
+- ห้ามใส่ Channel Access Token, LINE Login Channel secret หรือ Supabase service role key ใน frontend หรือ commit ลง repository

@@ -24,7 +24,7 @@ export function DriverSchedule() {
 
       const driverResult = await supabase
         .from('drivers')
-        .select('*')
+        .select('id, full_name, nickname, dept, is_active, created_at')
         .eq('full_name', session?.name || '')
         .maybeSingle()
 

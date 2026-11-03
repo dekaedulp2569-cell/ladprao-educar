@@ -49,7 +49,7 @@ export function AdminDashboard() {
     const [requestResult, carResult, driverResult] = await Promise.all([
       supabase.from('car_requests').select('*').order('created_at', { ascending: false }),
       supabase.from('cars').select('*').order('created_at', { ascending: true }),
-      supabase.from('drivers').select('*').order('created_at', { ascending: true }),
+      supabase.from('admin_drivers').select('*').order('created_at', { ascending: true }),
     ])
 
     if (requestResult.error || carResult.error || driverResult.error) {

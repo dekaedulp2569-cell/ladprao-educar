@@ -10,31 +10,35 @@ import { DriverSchedule } from './components/DriverSchedule'
 import { Card } from './components/ui'
 
 function App() {
-  const { session, canManage, logout } = useAuth()
+  const { session, canManage, logout, authLoading, isApproved } = useAuth()
   const [view, setView] = useState('calendar')
   const [loginOpen, setLoginOpen] = useState(false)
 
+  const activeView = session && session.approvalStatus !== 'approved' ? 'request' : view
+
   const navItems = [
     { id: 'calendar', label: 'ปฏิทินรถ' },
-    ...(session && session.role !== 'driver'
+    ...(isApproved && session.role !== 'driver'
       ? [
           { id: 'request', label: 'ขอใช้รถ' },
           { id: 'mine', label: 'คำขอของฉัน' },
         ]
       : []),
     ...(canManage ? [{ id: 'admin', label: 'จัดการคำขอ' }] : []),
-    ...(session?.role === 'driver' ? [{ id: 'driver', label: 'งานของฉัน' }] : []),
+    ...(isApproved && session?.role === 'driver' ? [{ id: 'driver', label: 'งานของฉัน' }] : []),
   ]
 
-  const handleLoggedIn = (role) => {
-    if (role === 'admin' || role === 'head_of_dept') setView('admin')
-    else if (role === 'driver') setView('driver')
-    else setView('request')
+  const handleLogout = async () => {
+    try {
+      await logout()
+      setView('calendar')
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : 'ออกจากระบบไม่สำเร็จ')
+    }
   }
 
-  const handleLogout = () => {
-    logout()
-    setView('calendar')
+  const handleLoggedIn = (approvalStatus) => {
+    if (approvalStatus) setView('request')
   }
 
   const handleSubmitted = (data, target) => {
@@ -43,7 +47,36 @@ function App() {
   }
 
   const requireAuth = (content) => {
-    if (session) return content
+    if (authLoading) {
+      return <Card className="mx-auto max-w-lg p-8 text-center text-sm text-slate-500">กำลังตรวจสอบบัญชี...</Card>
+    }
+    if (session?.approvalStatus === 'pending' || session?.approvalStatus === 'rejected') {
+      return (
+        <Card className="mx-auto max-w-lg p-8 text-center">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-amber-50 text-2xl">
+            {session.approvalStatus === 'pending' ? '⏳' : '⚠️'}
+          </div>
+          <h2 className="mt-4 text-xl font-bold text-slate-800">
+            {session.approvalStatus === 'pending' ? 'บัญชีอยู่ระหว่างรออนุมัติ' : 'บัญชีนี้ไม่ได้รับอนุมัติ'}
+          </h2>
+          <p className="mt-2 text-sm leading-relaxed text-slate-500">
+            {session.approvalStatus === 'pending'
+              ? 'ระบบรับข้อมูลบัญชี LINE แล้ว กรุณารอผู้ดูแลตรวจสอบและกำหนดสิทธิ์ก่อนเข้าใช้งาน'
+              : 'กรุณาติดต่อผู้ดูแลระบบหากคิดว่าสถานะบัญชีไม่ถูกต้อง'}
+          </p>
+          {session.approvalStatus === 'pending' ? (
+            <button
+              type="button"
+              onClick={() => window.location.reload()}
+              className="mt-5 rounded-xl border border-slate-300 px-4 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-50"
+            >
+              ตรวจสอบสถานะอีกครั้ง
+            </button>
+          ) : null}
+        </Card>
+      )
+    }
+    if (isApproved) return content
     return (
       <div className="mx-auto max-w-lg py-10">
         <Card className="p-8 text-center">
@@ -78,7 +111,7 @@ function App() {
   }
 
   const requireRole = (content) => {
-    if (!session) return requireAuth(content)
+    if (!isApproved) return requireAuth(content)
     if (canManage || session.role === 'driver') return content
     return (
       <div className="mx-auto max-w-lg py-10">
@@ -93,7 +126,7 @@ function App() {
           </p>
           <button
             type="button"
-            onClick={handleLogout}
+            onClick={() => void handleLogout()}
             className="mt-5 rounded-xl bg-brand-700 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-800"
           >
             ออกจากระบบเพื่อเปลี่ยนบทบาท
@@ -104,14 +137,14 @@ function App() {
   }
 
   const renderView = () => {
-    if (view === 'calendar') return <PublicCalendar />
-    if (view === 'request') {
+    if (activeView === 'calendar') return <PublicCalendar />
+    if (activeView === 'request') {
       return requireAuth(<CarRequestForm onSubmitted={handleSubmitted} />)
     }
-    if (view === 'mine') return requireAuth(<MyRequests />)
-    if (view === 'admin') return requireRole(<AdminDashboard />)
-    if (view === 'driver') {
-      if (!session) return requireAuth(null)
+    if (activeView === 'mine') return requireAuth(<MyRequests />)
+    if (activeView === 'admin') return requireRole(<AdminDashboard />)
+    if (activeView === 'driver') {
+      if (!isApproved) return requireAuth(null)
       if (session.role !== 'driver' && !canManage) return requireRole(null)
       return <DriverSchedule />
     }
@@ -145,7 +178,9 @@ function App() {
               <>
                 <div className="hidden text-right sm:block">
                   <p className="text-sm font-medium leading-tight">{session.name}</p>
-                  <p className="text-[11px] text-brand-100">{ROLE[session.role]}</p>
+                  <p className="text-[11px] text-brand-100">
+                    {session.approvalStatus === 'approved' ? ROLE[session.role] : 'รออนุมัติบัญชี'}
+                  </p>
                 </div>
                 <button
                   type="button"
@@ -175,7 +210,7 @@ function App() {
               onClick={() => setView(item.id)}
               className={classNames(
                 'whitespace-nowrap rounded-lg px-3 py-2 text-xs font-medium transition sm:text-sm',
-                view === item.id
+                activeView === item.id
                   ? 'bg-white text-brand-800 shadow-sm'
                   : 'text-brand-100 hover:bg-white/10 hover:text-white',
               )}

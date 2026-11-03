@@ -83,6 +83,7 @@ export function CarRequestForm({ onSubmitted }) {
 
     setSubmitting(true)
     const payload = {
+      requester_auth_user_id: session.userId,
       doc_type: form.doc_type,
       doc_number: form.doc_number.trim(),
       requester_name: form.requester_name.trim(),

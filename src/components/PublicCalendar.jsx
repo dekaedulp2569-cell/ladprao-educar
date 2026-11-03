@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import {
-  APPROVAL_TYPE,
   CAR_TYPE,
   STATUS,
   classNames,
@@ -11,8 +10,6 @@ import {
   monthLabel,
 } from '../lib/helpers'
 import { Card, EmptyState, SectionTitle, Spinner } from './ui'
-import { OfficialCarFormModal } from './OfficialCarFormModal'
-import { openForm3PrintWindow } from '../lib/printForm3'
 
 const WEEKDAYS = ['อา.', 'จ.', 'อ.', 'พ.', 'พฤ.', 'ศ.', 'ส.']
 
@@ -36,22 +33,19 @@ export function PublicCalendar() {
   const [carFilter, setCarFilter] = useState('all')
   const [requests, setRequests] = useState([])
   const [cars, setCars] = useState([])
-  const [drivers, setDrivers] = useState([])
-  const [printRequest, setPrintRequest] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
   const load = async () => {
     setLoading(true)
     setError('')
-    const [requestResult, carResult, driverResult] = await Promise.all([
+    const [requestResult, carResult] = await Promise.all([
       supabase
-        .from('car_requests')
-        .select('*')
+        .from('public_car_calendar')
+        .select('id, status, destination, destination_province, start_datetime, end_datetime, assigned_car_id, external_car_info')
         .in('status', ['approved', 'tentative'])
         .order('start_datetime', { ascending: true }),
       supabase.from('cars').select('*').order('created_at', { ascending: true }),
-      supabase.from('drivers').select('*').order('created_at', { ascending: true }),
     ])
 
     if (requestResult.error || carResult.error) {
@@ -59,7 +53,6 @@ export function PublicCalendar() {
     } else {
       setRequests(requestResult.data || [])
       setCars(carResult.data || [])
-      setDrivers(driverResult.data || [])
     }
     setLoading(false)
   }
@@ -73,12 +66,6 @@ export function PublicCalendar() {
     cars.forEach((car) => map.set(car.id, car))
     return map
   }, [cars])
-
-  const driverById = useMemo(() => {
-    const map = new Map()
-    drivers.forEach((driver) => map.set(driver.id, driver))
-    return map
-  }, [drivers])
 
   const filteredRequests = useMemo(() => {
     if (carFilter === 'all') return requests
@@ -325,8 +312,6 @@ export function PublicCalendar() {
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
             {selectedEvents.map((event) => {
               const car = carById.get(event.assigned_car_id)
-              const driver = driverById.get(event.assigned_driver_id)
-              const approval = APPROVAL_TYPE[event.approval_type] || APPROVAL_TYPE.head_of_dept
 
               return (
                 <div
@@ -352,41 +337,7 @@ export function PublicCalendar() {
                       </p>
                     </div>
 
-                    {/* วัตถุประสงค์ */}
-                    {event.purpose ? (
-                      <div className="rounded-xl bg-slate-50 p-2.5 text-xs text-slate-700">
-                        <span className="font-semibold text-slate-800">วัตถุประสงค์: </span>
-                        <span>{event.purpose}</span>
-                      </div>
-                    ) : null}
-
-                    {/* รายละเอียดเพิ่มเติมในรูปแบบรายการแนวตั้ง */}
                     <div className="space-y-1.5 text-xs text-slate-600">
-                      <div className="flex items-start gap-2">
-                        <span className="w-5 text-center text-slate-400">👤</span>
-                        <div className="flex-1">
-                          <span className="font-medium text-slate-800">{event.requester_name}</span>
-                          <span className="text-slate-400"> · {event.requester_position}</span>
-                        </div>
-                      </div>
-
-                      <div className="flex items-start gap-2">
-                        <span className="w-5 text-center text-slate-400">🏢</span>
-                        <span className="flex-1 text-slate-600 truncate">{event.requester_department}</span>
-                      </div>
-
-                      {event.phone ? (
-                        <div className="flex items-center gap-2">
-                          <span className="w-5 text-center text-slate-400">📞</span>
-                          <span className="text-slate-600">{event.phone}</span>
-                        </div>
-                      ) : null}
-
-                      <div className="flex items-center gap-2">
-                        <span className="w-5 text-center text-slate-400">👥</span>
-                        <span className="text-slate-700 font-medium">ผู้โดยสาร {event.passenger_count} คน</span>
-                      </div>
-
                       <div className="flex items-start gap-2 pt-1 border-t border-slate-100">
                         <span className="w-5 text-center text-slate-400">🚐</span>
                         <div className="flex-1">
@@ -395,33 +346,11 @@ export function PublicCalendar() {
                           </span>
                         </div>
                       </div>
-
-                      <div className="flex items-start gap-2">
-                        <span className="w-5 text-center text-slate-400">🧑‍✈️</span>
-                        <span className="flex-1 text-slate-700">
-                          {driver ? driver.full_name : event.external_driver_name || 'ยังไม่ระบุพนักงานขับรถ'}
-                        </span>
-                      </div>
-
-                      <div className="flex items-center gap-2">
-                        <span className="w-5 text-center text-slate-400">📄</span>
-                        <span className="text-slate-500 font-mono text-[11px]">{event.doc_number || '-'}</span>
-                      </div>
                     </div>
                   </div>
 
-                  {/* ปุ่มท้ายการ์ดสำหรับดู/พิมพ์แบบ 3 */}
-                  <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between gap-2">
-                    <span className="text-[11px] text-slate-400 truncate">
-                      {approval.label}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => openForm3PrintWindow(event, car, driver)}
-                      className="inline-flex items-center gap-1 rounded-lg bg-brand-50 px-2.5 py-1.5 text-xs font-semibold text-brand-700 transition hover:bg-brand-100 hover:text-brand-800"
-                    >
-                      📄 พิมพ์แบบ ๓ (A4)
-                    </button>
+                  <div className="mt-4 border-t border-slate-100 pt-3 text-[11px] text-slate-400">
+                    ตารางนี้แสดงเฉพาะช่วงเวลาและสถานที่ เพื่อคุ้มครองข้อมูลผู้ขอ
                   </div>
                 </div>
               )
@@ -430,14 +359,6 @@ export function PublicCalendar() {
         )}
       </Card>
 
-      {/* Modal แบบ 3 ใบขออนุญาตใช้รถส่วนกลาง */}
-      <OfficialCarFormModal
-        open={Boolean(printRequest)}
-        onClose={() => setPrintRequest(null)}
-        request={printRequest?.request}
-        car={printRequest?.car}
-        driver={printRequest?.driver}
-      />
     </div>
   )
 }
