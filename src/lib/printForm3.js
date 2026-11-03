@@ -264,13 +264,13 @@ export function generateForm3Html(request, car, driver, recipient) {
     }
 
     .signature-date {
+      display: flex;
+      align-items: baseline;
+      justify-content: center;
+      gap: 10mm;
+      width: 100%;
       margin-top: 1mm !important;
-      letter-spacing: 1mm;
-    }
-
-    .signature-date span {
-      letter-spacing: 0;
-      font-size: 14pt;
+      white-space: nowrap;
     }
 
     @media screen {
@@ -370,16 +370,14 @@ export function generateForm3Html(request, car, driver, recipient) {
 
     <section class="signature review-signature">
       <p class="signature-line">(ลงชื่อ)............................................................หัวหน้าฝ่ายหรือผู้แทน</p>
-      <p>(............................................................)</p>
-      <p class="signature-date">/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;/&nbsp;<span>(วัน เดือน ปี)</span></p>
+      <p class="signature-date"><span>/</span><span>/</span><span>(วัน เดือน ปี)</span></p>
     </section>
 
     <p class="approval-order">อนุญาต และพนักงานขับรถยนต์จัดทำแบบรายงานการใช้รถ (แบบ ๔) ให้เรียบร้อยด้วย</p>
 
     <section class="signature authority-signature">
       <p class="signature-line">(ลงนามผู้มีอำนาจสั่งใช้รถ)............................................................</p>
-      <p>(............................................................)</p>
-      <p class="signature-date">/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;/&nbsp;<span>(วัน เดือน ปี)</span></p>
+      <p class="signature-date"><span>/</span><span>/</span><span>(วัน เดือน ปี)</span></p>
     </section>
   </main>
 </body>
