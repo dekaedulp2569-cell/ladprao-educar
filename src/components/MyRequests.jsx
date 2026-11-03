@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext'
 import { APPROVAL_TYPE, formatDateTimeRange } from '../lib/helpers'
 import { Card, EmptyState, SectionTitle, Spinner, StatusBadge } from './ui'
 import { OfficialCarFormModal } from './OfficialCarFormModal'
+import { openForm3PrintWindow } from '../lib/printForm3'
 
 export function MyRequests() {
   const { session } = useAuth()
@@ -116,11 +117,11 @@ export function MyRequests() {
                       onClick={() => {
                         const car = cars.find((c) => c.id === request.assigned_car_id)
                         const driver = drivers.find((d) => d.id === request.assigned_driver_id)
-                        setPrintRequest({ request, car, driver })
+                        openForm3PrintWindow(request, car, driver)
                       }}
                       className="inline-flex items-center gap-1.5 rounded-lg bg-brand-50 px-3 py-1.5 text-xs font-semibold text-brand-700 transition hover:bg-brand-100"
                     >
-                      📄 พิมพ์แบบ 3
+                      📄 พิมพ์แบบ ๓ (A4)
                     </button>
                   </div>
                 </div>

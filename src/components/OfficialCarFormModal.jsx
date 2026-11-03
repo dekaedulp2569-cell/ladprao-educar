@@ -1,13 +1,14 @@
 import { useMemo, useState } from 'react'
-import { bangkokParts, CAR_TYPE, THAI_MONTHS_LONG } from '../lib/helpers'
+import { bangkokParts, CAR_TYPE, THAI_MONTHS_LONG, toThaiDigits } from '../lib/helpers'
+import { openForm3PrintWindow } from '../lib/printForm3'
 
 export function OfficialCarFormModal({ open, onClose, request, car, driver }) {
-  const [recipient, setRecipient] = useState(() => {
-    if (request?.approval_type === 'district_director' || request?.is_out_of_bkk || request?.is_out_of_hours) {
-      return 'ผู้อำนวยการเขตลาดพร้าว'
-    }
-    return 'ผู้อำนวยการเขตลาดพร้าว'
-  })
+  const [recipientSelection, setRecipientSelection] = useState(null)
+  const defaultRecipient =
+    request?.approval_type === 'district_director' || request?.is_out_of_bkk || request?.is_out_of_hours
+      ? 'ปลัดกรุงเทพมหานคร'
+      : 'ผู้อำนวยการเขตลาดพร้าว'
+  const recipient = recipientSelection?.request === request ? recipientSelection.value : defaultRecipient
 
   // แยกส่วนประกอบวันเวลาไทย
   const reqParts = useMemo(() => bangkokParts(request?.created_at), [request?.created_at])
@@ -17,12 +18,27 @@ export function OfficialCarFormModal({ open, onClose, request, car, driver }) {
   if (!open || !request) return null
 
   const handlePrint = () => {
-    window.print()
+    openForm3PrintWindow(request, car, driver, recipient)
   }
 
-  const carPlate = car?.license_plate || request.external_car_info || '....................................................'
-  const carTypeLabel = car ? (CAR_TYPE[car.car_type] || 'รถยนต์') : 'รถยนต์'
-  const driverName = driver?.full_name || request.external_driver_name || '....................................................'
+  const reqDay = reqParts ? toThaiDigits(Number(reqParts.day)) : '..........'
+  const reqMonth = reqParts ? THAI_MONTHS_LONG[reqParts.month - 1] : '....................'
+  const reqYear = reqParts ? toThaiDigits(reqParts.year) : '..........'
+
+  const startDay = startParts ? toThaiDigits(Number(startParts.day)) : '..........'
+  const startMonth = startParts ? THAI_MONTHS_LONG[startParts.month - 1] : '....................'
+  const startYear = startParts ? toThaiDigits(startParts.year) : '..........'
+  const startTime = startParts ? toThaiDigits(`${startParts.hour}.${startParts.minute}`) : '..........'
+
+  const endDay = endParts ? toThaiDigits(Number(endParts.day)) : '..........'
+  const endMonth = endParts ? THAI_MONTHS_LONG[endParts.month - 1] : '....................'
+  const endYear = endParts ? toThaiDigits(endParts.year) : '..........'
+  const endTime = endParts ? toThaiDigits(`${endParts.hour}.${endParts.minute}`) : '..........'
+
+  const passengerCount = toThaiDigits(request.passenger_count || 1)
+  const carPlate = toThaiDigits(car?.license_plate || request.external_car_info || '')
+  const carTypeLabel = car ? (CAR_TYPE[car.car_type] || 'รถตู้') : 'รถตู้'
+  const driverName = driver?.full_name || request.external_driver_name || ''
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 p-2 sm:p-4 print:static print:p-0 print:bg-white">
@@ -31,14 +47,14 @@ export function OfficialCarFormModal({ open, onClose, request, car, driver }) {
         <div className="flex items-center gap-2">
           <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-brand-100 text-lg">📄</span>
           <div>
-            <h3 className="text-sm font-bold text-slate-800 sm:text-base">แบบ 3 ใบขออนุญาตใช้รถส่วนกลาง</h3>
-            <p className="text-xs text-slate-500">เอกสารสำหรับลงนามสั่งใช้รถตามระเบียบกรุงเทพมหานคร</p>
+            <h3 className="text-sm font-bold text-slate-800 sm:text-base">แบบ ๓ ใบขออนุญาตใช้รถส่วนกลาง</h3>
+            <p className="text-xs text-slate-500">เอกสารสำหรับลงนามสั่งใช้รถตามระเบียบกรุงเทพมหานคร (เลขไทยทั้งหมด)</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
           <select
             value={recipient}
-            onChange={(e) => setRecipient(e.target.value)}
+            onChange={(e) => setRecipientSelection({ request, value: e.target.value })}
             className="rounded-lg border border-slate-300 bg-slate-50 px-2.5 py-1.5 text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-brand-500"
           >
             <option value="ผู้อำนวยการเขตลาดพร้าว">เรียน: ผู้อำนวยการเขตลาดพร้าว</option>
@@ -49,7 +65,7 @@ export function OfficialCarFormModal({ open, onClose, request, car, driver }) {
             onClick={handlePrint}
             className="flex items-center gap-1.5 rounded-lg bg-brand-700 px-3.5 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-brand-800"
           >
-            🖨️ พิมพ์เอกสาร
+            🖨️ เปิดหน้าพิมพ์ A4 (แท็บใหม่)
           </button>
           <button
             type="button"
@@ -62,10 +78,10 @@ export function OfficialCarFormModal({ open, onClose, request, car, driver }) {
       </div>
 
       {/* แผ่นกระดาษเอกสาร A4 จำลอง */}
-      <div className="printable-document mx-auto max-w-[210mm] rounded-xl border border-slate-200 bg-white p-8 text-black shadow-2xl sm:p-12 print:m-0 print:max-w-none print:rounded-none print:border-none print:p-0 print:shadow-none">
+      <div className="printable-document mx-auto max-w-[210mm] rounded-xl border border-slate-200 bg-white p-8 text-black shadow-2xl sm:p-12 print:m-0 print:max-w-none print:rounded-none print:border-none print:p-0 print:shadow-none font-['Sarabun',sans-serif]">
         {/* หัวกระดาษ */}
-        <div className="flex justify-end text-sm font-medium">
-          <span className="border-b border-dotted border-black px-2 pb-0.5 font-bold">แบบ 3</span>
+        <div className="flex justify-end text-base font-bold">
+          <span>แบบ ๓</span>
         </div>
 
         <div className="mt-4 text-center">
@@ -77,15 +93,15 @@ export function OfficialCarFormModal({ open, onClose, request, car, driver }) {
           <div className="flex items-baseline gap-2">
             <span>วันที่</span>
             <span className="min-w-[3rem] border-b border-dotted border-slate-700 text-center font-semibold">
-              {reqParts?.day || '..........'}
+              {reqDay}
             </span>
             <span>เดือน</span>
             <span className="min-w-[6rem] border-b border-dotted border-slate-700 text-center font-semibold">
-              {reqParts ? THAI_MONTHS_LONG[reqParts.month - 1] : '....................'}
+              {reqMonth}
             </span>
             <span>พ.ศ.</span>
             <span className="min-w-[4rem] border-b border-dotted border-slate-700 text-center font-semibold">
-              {reqParts?.year || '..........'}
+              {reqYear}
             </span>
           </div>
         </div>
@@ -132,47 +148,47 @@ export function OfficialCarFormModal({ open, onClose, request, car, driver }) {
             </span>
             <span>มีคนนั่ง</span>
             <span className="min-w-[3.5rem] border-b border-dotted border-slate-700 text-center font-semibold text-slate-900">
-              {request.passenger_count || '1'}
+              {passengerCount}
             </span>
             <span>คน</span>
           </div>
 
           <div className="flex flex-wrap items-baseline gap-2">
-            <span>ในวันที่</span>
+            <span>ในวัน</span>
             <span className="min-w-[3rem] border-b border-dotted border-slate-700 text-center font-semibold text-slate-900">
-              {startParts?.day || '..........'}
+              {startDay}
             </span>
             <span>เดือน</span>
             <span className="min-w-[6rem] border-b border-dotted border-slate-700 text-center font-semibold text-slate-900">
-              {startParts ? THAI_MONTHS_LONG[startParts.month - 1] : '....................'}
+              {startMonth}
             </span>
             <span>พ.ศ.</span>
             <span className="min-w-[4rem] border-b border-dotted border-slate-700 text-center font-semibold text-slate-900">
-              {startParts?.year || '..........'}
+              {startYear}
             </span>
             <span>เวลา</span>
             <span className="min-w-[4rem] border-b border-dotted border-slate-700 text-center font-semibold text-slate-900">
-              {startParts ? `${startParts.hour}.${startParts.minute}` : '..........'}
+              {startTime}
             </span>
             <span>น.</span>
           </div>
 
           <div className="flex flex-wrap items-baseline gap-2">
-            <span>ถึงวันที่</span>
+            <span>ถึงวัน</span>
             <span className="min-w-[3rem] border-b border-dotted border-slate-700 text-center font-semibold text-slate-900">
-              {endParts?.day || '..........'}
+              {endDay}
             </span>
             <span>เดือน</span>
             <span className="min-w-[6rem] border-b border-dotted border-slate-700 text-center font-semibold text-slate-900">
-              {endParts ? THAI_MONTHS_LONG[endParts.month - 1] : '....................'}
+              {endMonth}
             </span>
             <span>พ.ศ.</span>
             <span className="min-w-[4rem] border-b border-dotted border-slate-700 text-center font-semibold text-slate-900">
-              {endParts?.year || '..........'}
+              {endYear}
             </span>
             <span>เวลา</span>
             <span className="min-w-[4rem] border-b border-dotted border-slate-700 text-center font-semibold text-slate-900">
-              {endParts ? `${endParts.hour}.${endParts.minute}` : '..........'}
+              {endTime}
             </span>
             <span>น.</span>
           </div>
@@ -199,14 +215,14 @@ export function OfficialCarFormModal({ open, onClose, request, car, driver }) {
             </span>
             <span>หมายเลขทะเบียน</span>
             <span className="min-w-[10rem] flex-1 border-b border-dotted border-slate-700 px-2 font-semibold text-slate-900">
-              {carPlate}
+              {carPlate || '............................................................'}
             </span>
           </div>
 
           <div className="flex flex-wrap items-baseline gap-2">
             <span>พนักงานขับรถยนต์</span>
             <span className="flex-1 border-b border-dotted border-slate-700 px-2 font-semibold text-slate-900">
-              {driverName}
+              {driverName || '............................................................'}
             </span>
           </div>
         </div>
@@ -230,7 +246,7 @@ export function OfficialCarFormModal({ open, onClose, request, car, driver }) {
         <div className="mt-8 rounded-lg border border-slate-300 p-4 print:border-none print:p-0">
           <p className="font-bold text-base">คำสั่ง:</p>
           <p className="mt-2 text-base indent-8">
-            อนุญาต และพนักงานขับรถยนต์จัดทำแบบรายงานการใช้รถ (แบบ 4) ให้เรียบร้อยด้วย
+            อนุญาต และพนักงานขับรถยนต์จัดทำแบบรายงานการใช้รถ (แบบ ๔) ให้เรียบร้อยด้วย
           </p>
 
           <div className="mt-6 flex justify-end text-base">
@@ -250,7 +266,7 @@ export function OfficialCarFormModal({ open, onClose, request, car, driver }) {
 
         {/* หมายเหตุท้ายเอกสาร */}
         <div className="mt-6 border-t border-slate-200 pt-3 text-[11px] text-slate-400 print:text-[10px] print:text-slate-500">
-          <p>เลขที่คำขอ: {request.doc_number || '-'} · ระบบขอใช้รถและจัดสรรคิวรถ ฝ่ายการศึกษา สำนักงานเขตลาดพร้าว</p>
+          <p>เลขที่คำขอ: {toThaiDigits(request.doc_number || '-')} · ระบบขอใช้รถและจัดสรรคิวรถ ฝ่ายการศึกษา สำนักงานเขตลาดพร้าว</p>
         </div>
       </div>
     </div>

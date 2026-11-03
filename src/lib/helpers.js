@@ -58,6 +58,13 @@ export const CAR_TYPE = {
   other: 'อื่น ๆ',
 }
 
+/** แปลงตัวเลขอารบิกเป็นเลขไทย */
+export function toThaiDigits(value) {
+  if (value === null || value === undefined) return ''
+  const thaiDigits = ['๐', '๑', '๒', '๓', '๔', '๕', '๖', '๗', '๘', '๙']
+  return String(value).replace(/[0-9]/g, (digit) => thaiDigits[Number(digit)])
+}
+
 /** แปลง datetime-local (เวลาท้องถิ่น) เป็น ISO สำหรับ Supabase */
 export function toISO(localValue) {
   if (!localValue) return null

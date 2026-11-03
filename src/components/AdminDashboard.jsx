@@ -19,6 +19,7 @@ import { PROVINCES } from '../lib/provinces'
 import { Alert, Card, EmptyState, Modal, SectionTitle, Spinner, StatusBadge } from './ui'
 import { OfficialCarFormModal } from './OfficialCarFormModal'
 import { MembersPanel } from './MembersPanel'
+import { openForm3PrintWindow } from '../lib/printForm3'
 
 const STATUS_TABS = [
   { value: 'all', label: 'ทั้งหมด' },
@@ -338,7 +339,7 @@ export function AdminDashboard() {
                     cars={cars}
                     drivers={drivers}
                     onOpen={() => setSelected(request)}
-                    onPrint={() => setPrintRequest({ request, car, driver })}
+                    onPrint={() => openForm3PrintWindow(request, car, driver)}
                   />
                 )
               })}
@@ -376,7 +377,7 @@ export function AdminDashboard() {
         onPrint={(req) => {
           const car = cars.find((c) => c.id === req.assigned_car_id)
           const driver = drivers.find((d) => d.id === req.assigned_driver_id)
-          setPrintRequest({ request: req, car, driver })
+          openForm3PrintWindow(req, car, driver)
         }}
       />
 
@@ -453,7 +454,7 @@ function RequestCard({ request, cars, drivers, onOpen, onPrint }) {
             onClick={onPrint}
             className="rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-100"
           >
-            📄 พิมพ์แบบ 3
+            📄 พิมพ์แบบ ๓ (A4)
           </button>
           <button
             type="button"
@@ -516,7 +517,7 @@ function RequestDetail({ request, cars, drivers, busy, onClose, onApprove, onRej
               onClick={() => onPrint(request)}
               className="inline-flex items-center gap-1.5 rounded-xl border border-brand-300 bg-brand-50 px-3 py-1.5 text-xs font-semibold text-brand-800 transition hover:bg-brand-100"
             >
-              📄 พิมพ์แบบ 3 (ใบขอใช้รถ)
+              📄 พิมพ์แบบ ๓ (A4)
             </button>
             <StatusBadge status={request.status} />
           </div>

@@ -12,6 +12,7 @@ import {
 } from '../lib/helpers'
 import { Card, EmptyState, SectionTitle, Spinner } from './ui'
 import { OfficialCarFormModal } from './OfficialCarFormModal'
+import { openForm3PrintWindow } from '../lib/printForm3'
 
 const WEEKDAYS = ['อา.', 'จ.', 'อ.', 'พ.', 'พฤ.', 'ศ.', 'ส.']
 
@@ -416,10 +417,10 @@ export function PublicCalendar() {
                     </span>
                     <button
                       type="button"
-                      onClick={() => setPrintRequest({ request: event, car, driver })}
+                      onClick={() => openForm3PrintWindow(event, car, driver)}
                       className="inline-flex items-center gap-1 rounded-lg bg-brand-50 px-2.5 py-1.5 text-xs font-semibold text-brand-700 transition hover:bg-brand-100 hover:text-brand-800"
                     >
-                      📄 พิมพ์แบบ 3
+                      📄 พิมพ์แบบ ๓ (A4)
                     </button>
                   </div>
                 </div>

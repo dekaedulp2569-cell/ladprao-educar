@@ -13,6 +13,7 @@ import {
 } from '../lib/helpers'
 import { Alert, Card, SectionTitle } from './ui'
 import { OfficialCarFormModal } from './OfficialCarFormModal'
+import { openForm3PrintWindow } from '../lib/printForm3'
 
 const emptyForm = {
   doc_type: 'school_letter',
@@ -194,14 +195,23 @@ export function CarRequestForm({ onSubmitted }) {
 
             <div className="rounded-xl border border-brand-200 bg-brand-50/70 p-4 text-center">
               <p className="text-sm font-semibold text-brand-900">เอกสารสำหรับลงนามสั่งใช้รถ</p>
-              <p className="mt-1 text-xs text-brand-700">สามารถเปิดดูและสั่งพิมพ์ &quot;แบบ 3 ใบขออนุญาตใช้รถส่วนกลาง&quot; เพื่อนำไปเสนอผู้บังคับบัญชาลงนามได้ทันที</p>
-              <button
-                type="button"
-                onClick={() => setShowPrintForm(true)}
-                className="mt-3 inline-flex items-center gap-2 rounded-xl bg-brand-700 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-800"
-              >
-                📄 ดู/พิมพ์แบบ 3 ใบขออนุญาตใช้รถส่วนกลาง
-              </button>
+              <p className="mt-1 text-xs text-brand-700">สามารถเปิดดูและสั่งพิมพ์ &quot;แบบ ๓ ใบขออนุญาตใช้รถส่วนกลาง&quot; (หน้าเว็บ A4 / เลขไทย) เพื่อนำไปเสนอผู้บังคับบัญชาลงนามได้ทันที</p>
+              <div className="mt-3 flex flex-wrap justify-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => openForm3PrintWindow(submitted)}
+                  className="inline-flex items-center gap-2 rounded-xl bg-brand-700 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-800"
+                >
+                  🖨️ เปิดหน้าพิมพ์แบบ ๓ (A4)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowPrintForm(true)}
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-brand-300 bg-white px-4 py-2.5 text-sm font-semibold text-brand-800 shadow-sm transition hover:bg-brand-50"
+                >
+                  📄 ดูตัวอย่างเอกสาร
+                </button>
+              </div>
             </div>
 
             <div className="flex flex-col gap-2 sm:flex-row">
