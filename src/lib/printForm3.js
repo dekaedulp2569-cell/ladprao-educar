@@ -40,6 +40,9 @@ export function generateForm3Html(request, car, driver, recipient) {
     recipient || (isSpecialApproval ? OUT_OF_HOURS_RECIPIENT : BUSINESS_HOURS_RECIPIENT)
   const requesterName = printable(request.requester_name || '............................................................')
   const requesterPosition = printable(request.requester_position || '............................................................')
+  const requesterDepartment = printable(
+    request.requester_department || 'ฝ่ายการศึกษา สำนักงานเขตลาดพร้าว',
+  )
   const destination = printable(request.destination || '')
   const province = request.destination_province ? ` (${printable(request.destination_province)})` : ''
   const purpose = printable(request.purpose || '....................................................................................................')
@@ -122,37 +125,52 @@ export function generateForm3Html(request, car, driver, recipient) {
       line-height: 1.4;
     }
 
-    .indent {
-      text-indent: 20mm;
-    }
-
     .value {
       font-weight: 700;
     }
 
-    .requester-line {
-      display: inline-block;
-      min-width: 43mm;
-    }
-
-    .position-line {
-      display: inline-block;
-      min-width: 35mm;
+    .requester-identity {
+      display: flex;
+      align-items: baseline;
+      gap: 2mm;
+      white-space: nowrap;
     }
 
     .signature {
-      width: 80mm;
-      margin: 7mm 0 6mm auto;
+      width: max-content;
+      max-width: 100%;
+      margin-left: auto;
       text-align: center;
-      line-height: 1.35;
+      line-height: 1.4;
+    }
+
+    .signature-line {
+      white-space: nowrap;
+    }
+
+    .requester-signature {
+      margin-top: 7mm;
+      margin-bottom: 0;
+    }
+
+    .review-signature {
+      margin-top: 8mm;
+      margin-bottom: 0;
+    }
+
+    .authority-signature {
+      margin-top: 8mm;
+      margin-bottom: 21mm;
+    }
+
+    .approval-order {
+      margin: 24mm 0 0;
+      text-align: center;
+      font-weight: 700;
     }
 
     .signature p {
       margin: 0;
-    }
-
-    .signature .signature-name {
-      margin-top: 1mm;
     }
 
     .vehicle {
@@ -167,21 +185,6 @@ export function generateForm3Html(request, car, driver, recipient) {
 
     .vehicle .driver-row {
       margin-top: 1mm;
-    }
-
-    .review-signature {
-      margin-top: 7mm;
-      margin-bottom: 5mm;
-    }
-
-    .approval-order {
-      margin: 5mm 0;
-      text-align: center;
-      font-weight: 700;
-    }
-
-    .authority-signature {
-      margin-top: 5mm;
     }
 
     .signature-date {
@@ -234,9 +237,9 @@ export function generateForm3Html(request, car, driver, recipient) {
     <p class="recipient">เรียน&nbsp;&nbsp;${printable(selectedRecipient)}</p>
 
     <section class="details">
-      <p class="detail-row indent">
-        ข้าพเจ้า <span class="value requester-line">${requesterName}</span>
-        &nbsp;&nbsp;ตำแหน่ง <span class="value position-line">${requesterPosition}</span>
+      <p class="detail-row requester-identity">
+        <span>ข้าพเจ้า&nbsp;<span class="value">${requesterName}</span></span>
+        <span>ตำแหน่ง&nbsp;<span class="value">${requesterPosition}</span></span>
       </p>
       <p class="detail-row">
         ขออนุญาตใช้รถ (ไปที่ไหน)&nbsp;&nbsp;<span class="value">${destination}${province}</span>
@@ -255,9 +258,11 @@ export function generateForm3Html(request, car, driver, recipient) {
       </p>
     </section>
 
-    <section class="signature">
-      <p>(ลงชื่อ)&nbsp;&nbsp;............................................................&nbsp;&nbsp;ผู้ขออนุญาต</p>
-      <p class="signature-name">(&nbsp;<span class="value">${requesterName}</span>&nbsp;)</p>
+    <section class="signature requester-signature">
+      <p class="signature-line">(ลงชื่อ)............................................................ผู้ขออนุญาต</p>
+      <p>(${requesterName})</p>
+      <p>${requesterPosition}</p>
+      <p>${requesterDepartment}</p>
     </section>
 
     <section class="vehicle">
@@ -269,16 +274,16 @@ export function generateForm3Html(request, car, driver, recipient) {
     </section>
 
     <section class="signature review-signature">
-      <p>ลงชื่อ&nbsp;&nbsp;............................................................&nbsp;&nbsp;หัวหน้าฝ่ายหรือผู้แทน</p>
-      <p class="signature-name">(&nbsp;............................................................&nbsp;)</p>
+      <p class="signature-line">(ลงชื่อ)............................................................หัวหน้าฝ่ายหรือผู้แทน</p>
+      <p>(............................................................)</p>
       <p class="signature-date">/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;/&nbsp;<span>(วัน เดือน ปี)</span></p>
     </section>
 
     <p class="approval-order">อนุญาต และพนักงานขับรถยนต์จัดทำแบบรายงานการใช้รถ (แบบ ๔) ให้เรียบร้อยด้วย</p>
 
     <section class="signature authority-signature">
-      <p>(ลงนามผู้มีอำนาจสั่งใช้รถ)&nbsp;&nbsp;............................................................</p>
-      <p class="signature-name">(&nbsp;............................................................&nbsp;)</p>
+      <p class="signature-line">(ลงนามผู้มีอำนาจสั่งใช้รถ)............................................................</p>
+      <p>(............................................................)</p>
       <p class="signature-date">/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;/&nbsp;<span>(วัน เดือน ปี)</span></p>
     </section>
   </main>
