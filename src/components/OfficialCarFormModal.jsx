@@ -8,7 +8,10 @@ export function OfficialCarFormModal({ open, onClose, request, car, driver }) {
     request?.approval_type === 'district_director' || request?.is_out_of_bkk || request?.is_out_of_hours
       ? 'ปลัดกรุงเทพมหานคร'
       : 'ผู้อำนวยการเขตลาดพร้าว'
-  const recipient = recipientSelection?.request === request ? recipientSelection.value : defaultRecipient
+  const recipient =
+    recipientSelection && recipientSelection.request === request
+      ? recipientSelection.value
+      : defaultRecipient
 
   // แยกส่วนประกอบวันเวลาไทย
   const reqParts = useMemo(() => bangkokParts(request?.created_at), [request?.created_at])
