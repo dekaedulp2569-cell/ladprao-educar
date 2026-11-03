@@ -230,13 +230,17 @@ export function generateForm3Html(request, car, driver, recipient) {
     }
 
     .review-signature {
+      width: 98mm;
       margin-top: 8mm;
       margin-bottom: 0;
+      text-align: left;
     }
 
     .authority-signature {
+      width: 98mm;
       margin-top: 8mm;
-      margin-bottom: 21mm;
+      margin-bottom: 0;
+      text-align: left;
     }
 
     .approval-order {
@@ -267,10 +271,14 @@ export function generateForm3Html(request, car, driver, recipient) {
       display: flex;
       align-items: baseline;
       justify-content: center;
-      gap: 10mm;
       width: 100%;
-      margin-top: 1mm !important;
+      margin-top: calc(3 * 1.4em) !important;
       white-space: nowrap;
+    }
+
+    .signature-date-spacer {
+      display: inline-block;
+      width: 10ch;
     }
 
     @media screen {
@@ -370,14 +378,20 @@ export function generateForm3Html(request, car, driver, recipient) {
 
     <section class="signature review-signature">
       <p class="signature-line">(ลงชื่อ)............................................................หัวหน้าฝ่ายหรือผู้แทน</p>
-      <p class="signature-date"><span>/</span><span>/</span><span>(วัน เดือน ปี)</span></p>
+      <p class="signature-date">
+        <span>/</span><span class="signature-date-spacer"></span><span>/</span>
+        <span class="signature-date-spacer"></span><span>(วัน เดือน ปี)</span>
+      </p>
     </section>
 
     <p class="approval-order">อนุญาต และพนักงานขับรถยนต์จัดทำแบบรายงานการใช้รถ (แบบ ๔) ให้เรียบร้อยด้วย</p>
 
     <section class="signature authority-signature">
       <p class="signature-line">(ลงนามผู้มีอำนาจสั่งใช้รถ)............................................................</p>
-      <p class="signature-date"><span>/</span><span>/</span><span>(วัน เดือน ปี)</span></p>
+      <p class="signature-date">
+        <span>/</span><span class="signature-date-spacer"></span><span>/</span>
+        <span class="signature-date-spacer"></span><span>(วัน เดือน ปี)</span>
+      </p>
     </section>
   </main>
 </body>
