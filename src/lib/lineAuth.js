@@ -25,7 +25,16 @@ export async function completeLineLogin() {
   })
 
   if (error) {
-    throw new Error(`ยืนยันบัญชี LINE ไม่สำเร็จ: ${error.message}`)
+    let detail = error.message
+    if (error.context instanceof Response) {
+      try {
+        const responseBody = await error.context.clone().json()
+        if (typeof responseBody?.error === 'string') detail = responseBody.error
+      } catch {
+        detail = error.message
+      }
+    }
+    throw new Error(`ยืนยันบัญชี LINE ไม่สำเร็จ: ${detail}`)
   }
 
   if (!data?.email || !data?.hashedToken) {
