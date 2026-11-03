@@ -247,7 +247,9 @@ export function generateForm3Html(request, car, driver, recipient) {
     }
 
     .review-signature .signature-date {
-      width: 98mm;
+      width: 62mm;
+      margin-right: auto;
+      margin-left: auto !important;
     }
 
     .authority-signature {
@@ -255,6 +257,15 @@ export function generateForm3Html(request, car, driver, recipient) {
       margin-top: 8mm;
       margin-bottom: 0;
       text-align: left;
+    }
+
+    .authority-signature .signature-line {
+      width: 110mm;
+      margin-left: auto;
+    }
+
+    .authority-signature .signature-date {
+      width: 62mm;
     }
 
     .approval-order {
@@ -298,7 +309,7 @@ export function generateForm3Html(request, car, driver, recipient) {
 
     .signature-date-spacer {
       display: inline-block;
-      width: 10ch;
+      width: 5ch;
     }
 
     .signature-date-rule {
