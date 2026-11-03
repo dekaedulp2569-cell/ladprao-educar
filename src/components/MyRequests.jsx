@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
-import { APPROVAL_TYPE, formatDate, formatTime } from '../lib/helpers'
+import { APPROVAL_TYPE, formatDate, formatDateTimeRange, formatTime } from '../lib/helpers'
 import { Card, EmptyState, SectionTitle, Spinner, StatusBadge } from './ui'
 
 export function MyRequests() {
@@ -81,9 +81,8 @@ export function MyRequests() {
                     <StatusBadge status={request.status} />
                   </div>
                   <div className="mt-2 grid gap-1 text-xs text-slate-500 sm:grid-cols-2">
-                    <p>📅 {formatDate(request.start_datetime, true)}</p>
-                    <p>⏰ ถึง {formatTime(request.end_datetime)} น.</p>
-                    <p>👥 {request.passenger_count} คน</p>
+                    <p className="sm:col-span-2">📅 {formatDateTimeRange(request.start_datetime, request.end_datetime)}</p>
+                    <p>👥 ผู้โดยสาร {request.passenger_count} คน</p>
                     <p>✍️ {approval.label} ({approval.line})</p>
                   </div>
                   {request.status === 'tentative' ? (

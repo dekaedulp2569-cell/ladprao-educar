@@ -8,7 +8,9 @@
 // หากยังไม่ได้ตั้งค่า ฟังก์ชันจะคืน { skipped: true } เพื่อไม่ให้การบันทึกข้อมูลล้มเหลว
 
 import { supabase } from './supabase'
-import { formatDate, formatTime } from './helpers'
+import { formatDateTimeRange } from './helpers'
+
+export { formatDateTimeRange }
 
 export async function notifyLine(payload) {
   try {
@@ -32,7 +34,7 @@ export function buildStatusMessage(request, statusLabel) {
     `เลขที่เอกสาร: ${request.doc_number || '-'}`,
     `ผู้ขอ: ${request.requester_name || '-'}`,
     `ปลายทาง: ${request.destination || '-'} (${request.destination_province || '-'})`,
-    `วันเวลา: ${formatDate(request.start_datetime, true)} - ${formatTime(request.end_datetime)} น.`,
+    `วันเวลา: ${formatDateTimeRange(request.start_datetime, request.end_datetime)}`,
     `สถานะล่าสุด: ${statusLabel}`,
   ]
   return lines.join('\n')
@@ -41,7 +43,7 @@ export function buildStatusMessage(request, statusLabel) {
 export function buildDriverMessage(request, carLabel) {
   const lines = [
     '📋 งานใหม่ที่ได้รับมอบหมาย',
-    `วันที่: ${formatDate(request.start_datetime, true)} - ${formatTime(request.end_datetime)} น.`,
+    `วันเวลา: ${formatDateTimeRange(request.start_datetime, request.end_datetime)}`,
     `ปลายทาง: ${request.destination || '-'} (${request.destination_province || '-'})`,
     `รถ: ${carLabel || '-'}`,
     `ผู้ขอ: ${request.requester_name || '-'}`,

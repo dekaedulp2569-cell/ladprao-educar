@@ -190,7 +190,7 @@ function App() {
 
       <footer className="border-t border-slate-200 bg-white">
         <div className="mx-auto flex max-w-7xl flex-col gap-2 px-4 py-5 text-xs text-slate-500 sm:flex-row sm:items-center sm:justify-between sm:px-6">
-          <p>© {new Date().getFullYear()} ฝ่ายการศึกษา สำนักงานเขตลาดพร้าว</p>
+          <p>© {new Date().getFullYear() + 543} ฝ่ายการศึกษา สำนักงานเขตลาดพร้าว</p>
           <p className="text-slate-400">
             ระบบขอใช้รถและจัดสรรคิวรถ · ข้อมูลเชื่อมต่อ Supabase · พร้อมรองรับ LINE Login และ LINE Notify
           </p>

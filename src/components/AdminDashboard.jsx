@@ -12,6 +12,7 @@ import {
   fiscalYearOf,
   fiscalYearRange,
   formatDate,
+  formatDateTimeRange,
   formatTime,
   overlaps,
 } from '../lib/helpers'
@@ -408,8 +409,7 @@ function RequestCard({ request, cars, drivers, onOpen }) {
       <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-slate-600">
         <p>👤 {request.requester_name}</p>
         <p>🏢 {request.requester_department}</p>
-        <p>📅 {formatDate(request.start_datetime)}</p>
-        <p>⏰ {formatTime(request.start_datetime)} - {formatTime(request.end_datetime)} น.</p>
+        <p className="col-span-2">📅 {formatDateTimeRange(request.start_datetime, request.end_datetime)}</p>
         <p>🚐 {carLabel}</p>
         <p>🧑‍✈️ {driverLabel}</p>
       </div>

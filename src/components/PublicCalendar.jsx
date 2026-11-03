@@ -300,7 +300,7 @@ export function PublicCalendar() {
 
       <Card className="p-4 sm:p-6">
         <SectionTitle
-          title={`รายการใช้รถวันที่ ${formatDate(`${selectedKey}T12:00:00`, false)}`}
+          title={`รายการใช้รถวันที่ ${formatDate(`${selectedKey}T12:00:00+07:00`, false)}`}
           subtitle="แสดงเฉพาะรายการที่อนุมัติแล้วและรายการที่รอ ผอ.เขต อนุมัติ"
         />
         {selectedEvents.length === 0 ? (

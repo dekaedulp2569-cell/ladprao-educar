@@ -5,6 +5,7 @@ import {
   CAR_TYPE,
   dateKey,
   formatDate,
+  formatDateTimeRange,
   formatTime,
 } from '../lib/helpers'
 import { Card, EmptyState, SectionTitle, Spinner, StatusBadge } from './ui'
@@ -140,7 +141,7 @@ function JobSection({ title, subtitle, jobs, cars, emptyText, muted }) {
                 <div className="min-w-0">
                   <p className="truncate text-sm font-semibold text-slate-800">{job.destination}</p>
                   <p className="mt-0.5 text-xs text-slate-500">
-                    {formatDate(job.start_datetime)} · {formatTime(job.start_datetime)} - {formatTime(job.end_datetime)} น.
+                    📅 {formatDateTimeRange(job.start_datetime, job.end_datetime)}
                   </p>
                   <p className="mt-1 text-xs text-slate-500">
                     🚐 {car ? `${car.license_plate} (${CAR_TYPE[car.car_type] || 'รถ'})` : job.external_car_info || 'ยังไม่ระบุรถ'} · 👤 {job.requester_name}

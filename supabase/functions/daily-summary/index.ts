@@ -77,7 +77,7 @@ Deno.serve(async (req) => {
       ? `${car.license_plate} (${car.car_type === 'van' ? 'รถตู้' : car.car_type === 'pickup' ? 'รถกระบะ' : 'รถ'})`
       : job.external_car_info || 'ไม่ระบุรถ'
 
-    const line = `• ${formatThaiTime(job.start_datetime)}-${formatThaiTime(job.end_datetime)} น. ${job.destination} (${job.destination_province}) · ${job.requester_name}`
+    const line = `• ${formatThaiTime(job.start_datetime)} - ${formatThaiTime(job.end_datetime)} น. ${job.destination} (${job.destination_province}) · ${job.requester_name}`
 
     if (driver?.dept === 'education' && driver.line_user_id) {
       if (!personal.has(driver.line_user_id)) personal.set(driver.line_user_id, [])

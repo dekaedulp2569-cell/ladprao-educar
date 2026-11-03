@@ -93,38 +93,87 @@ export function isOutOfBkk(province) {
   return province !== 'กรุงเทพมหานคร'
 }
 
-/** แสดงวันที่แบบไทย เช่น 3 พ.ย. 2569 */
-export function formatDate(value, withTime = false) {
-  if (!value) return '-'
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return '-'
-  const options = {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-    timeZone: 'Asia/Bangkok',
+const THAI_MONTHS_SHORT = [
+  'ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.',
+  'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.',
+]
+
+const THAI_MONTHS_LONG = [
+  'มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน',
+  'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม',
+]
+
+const BKK_DATE_FORMAT = new Intl.DateTimeFormat('en-GB', {
+  day: '2-digit',
+  month: '2-digit',
+  year: 'numeric',
+  timeZone: 'Asia/Bangkok',
+})
+
+const BKK_TIME_FORMAT = new Intl.DateTimeFormat('en-GB', {
+  hour: '2-digit',
+  minute: '2-digit',
+  hour12: false,
+  timeZone: 'Asia/Bangkok',
+})
+
+/** แปลงวันที่เป็นส่วนประกอบตามเวลาไทย (พ.ศ.) */
+function bangkokParts(value) {
+  if (!value) return null
+  const date = value instanceof Date ? value : new Date(value)
+  if (Number.isNaN(date.getTime())) return null
+  const dateParts = Object.fromEntries(
+    BKK_DATE_FORMAT.formatToParts(date).map((part) => [part.type, part.value]),
+  )
+  const timeParts = Object.fromEntries(
+    BKK_TIME_FORMAT.formatToParts(date).map((part) => [part.type, part.value]),
+  )
+  return {
+    day: dateParts.day,
+    month: Number(dateParts.month),
+    year: Number(dateParts.year) + 543,
+    hour: timeParts.hour === '24' ? '00' : timeParts.hour,
+    minute: timeParts.minute,
   }
-  if (withTime) {
-    options.hour = '2-digit'
-    options.minute = '2-digit'
-  }
-  return date.toLocaleString('th-TH', options)
 }
 
+/**
+ * แสดงวันที่แบบไทย เช่น 04 พ.ย. 2569
+ * ถ้า withTime = true จะได้ 04 พ.ย. 2569 เวลา 08:00 น.
+ */
+export function formatDate(value, withTime = false) {
+  const parts = bangkokParts(value)
+  if (!parts) return '-'
+  const base = `${parts.day} ${THAI_MONTHS_SHORT[parts.month - 1]} ${parts.year}`
+  return withTime ? `${base} เวลา ${parts.hour}:${parts.minute} น.` : base
+}
+
+/** แสดงเวลาแบบ 24 ชั่วโมงตามเวลาไทย เช่น 08:00 */
 export function formatTime(value) {
-  if (!value) return '-'
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return '-'
-  return date.toLocaleTimeString('th-TH', {
-    hour: '2-digit',
-    minute: '2-digit',
-    timeZone: 'Asia/Bangkok',
-  })
+  const parts = bangkokParts(value)
+  if (!parts) return '-'
+  return `${parts.hour}:${parts.minute}`
+}
+
+/**
+ * ช่วงเวลาแบบไทย
+ * วันเดียวกัน: 04 พ.ย. 2569 เวลา 08:00 - 12:00 น.
+ * คนละวัน: 04 พ.ย. 2569 เวลา 08:00 น. - 05 พ.ย. 2569 เวลา 12:00 น.
+ */
+export function formatDateTimeRange(start, end) {
+  if (!start && !end) return '-'
+  if (!start) return formatDate(end, true)
+  if (!end) return formatDate(start, true)
+  if (dateKey(start) === dateKey(end)) {
+    return `${formatDate(start)} เวลา ${formatTime(start)} - ${formatTime(end)} น.`
+  }
+  return `${formatDate(start, true)} - ${formatDate(end, true)}`
 }
 
 /** yyyy-mm-dd ของวันที่ตามเวลาไทย ใช้จัดกลุ่มปฏิทิน */
 export function dateKey(value) {
-  const date = new Date(value)
+  if (!value) return ''
+  const date = value instanceof Date ? value : new Date(value)
   if (Number.isNaN(date.getTime())) return ''
   const parts = new Intl.DateTimeFormat('en-CA', {
     year: 'numeric',
@@ -136,10 +185,7 @@ export function dateKey(value) {
 }
 
 export function monthLabel(year, month) {
-  return new Date(year, month, 1).toLocaleDateString('th-TH', {
-    month: 'long',
-    year: 'numeric',
-  })
+  return `${THAI_MONTHS_LONG[month]} ${year + 543}`
 }
 
 /** ปีงบประมาณไทย: 1 ต.ค. - 30 ก.ย. */

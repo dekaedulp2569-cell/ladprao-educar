@@ -58,41 +58,88 @@ export async function pushText(to: string | undefined | null, text: string) {
   return { ok: true, skipped: false }
 }
 
-export function formatThaiDate(value?: string | Date | null) {
-  if (!value) return '-'
+const THAI_MONTHS_SHORT = [
+  'ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.',
+  'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.',
+]
+
+const BKK_DATE_FORMAT = new Intl.DateTimeFormat('en-GB', {
+  day: '2-digit',
+  month: '2-digit',
+  year: 'numeric',
+  timeZone: 'Asia/Bangkok',
+})
+
+const BKK_TIME_FORMAT = new Intl.DateTimeFormat('en-GB', {
+  hour: '2-digit',
+  minute: '2-digit',
+  hour12: false,
+  timeZone: 'Asia/Bangkok',
+})
+
+function bangkokParts(value?: string | Date | null) {
+  if (!value) return null
   const date = value instanceof Date ? value : new Date(value)
-  if (Number.isNaN(date.getTime())) return '-'
-  return new Intl.DateTimeFormat('th-TH', {
-    timeZone: 'Asia/Bangkok',
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-  }).format(date)
+  if (Number.isNaN(date.getTime())) return null
+  const dateParts = Object.fromEntries(
+    BKK_DATE_FORMAT.formatToParts(date).map((part) => [part.type, part.value]),
+  )
+  const timeParts = Object.fromEntries(
+    BKK_TIME_FORMAT.formatToParts(date).map((part) => [part.type, part.value]),
+  )
+  return {
+    day: dateParts.day,
+    month: Number(dateParts.month),
+    year: Number(dateParts.year) + 543,
+    hour: timeParts.hour === '24' ? '00' : timeParts.hour,
+    minute: timeParts.minute,
+  }
 }
 
-export function formatThaiDateTime(value?: string | null) {
-  if (!value) return '-'
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return '-'
-  return new Intl.DateTimeFormat('th-TH', {
-    timeZone: 'Asia/Bangkok',
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(date)
+/** 04 พ.ย. 2569 */
+export function formatThaiDate(value?: string | Date | null) {
+  const parts = bangkokParts(value)
+  if (!parts) return '-'
+  return `${parts.day} ${THAI_MONTHS_SHORT[parts.month - 1]} ${parts.year}`
 }
 
-export function formatThaiTime(value?: string | null) {
-  if (!value) return '-'
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return '-'
-  return new Intl.DateTimeFormat('th-TH', {
-    timeZone: 'Asia/Bangkok',
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(date)
+/** 04 พ.ย. 2569 เวลา 08:00 น. */
+export function formatThaiDateTime(value?: string | Date | null) {
+  const parts = bangkokParts(value)
+  if (!parts) return '-'
+  return `${formatThaiDate(value)} เวลา ${parts.hour}:${parts.minute} น.`
+}
+
+/** 08:00 */
+export function formatThaiTime(value?: string | Date | null) {
+  const parts = bangkokParts(value)
+  if (!parts) return '-'
+  return `${parts.hour}:${parts.minute}`
+}
+
+/**
+ * ช่วงเวลาแบบไทย
+ * วันเดียวกัน: 04 พ.ย. 2569 เวลา 08:00 - 12:00 น.
+ * คนละวัน: 04 พ.ย. 2569 เวลา 08:00 น. - 05 พ.ย. 2569 เวลา 12:00 น.
+ */
+export function formatThaiDateTimeRange(
+  start?: string | Date | null,
+  end?: string | Date | null,
+) {
+  const startParts = bangkokParts(start)
+  const endParts = bangkokParts(end)
+  if (!startParts) return '-'
+  if (!endParts) return formatThaiDateTime(start)
+
+  const sameDay =
+    startParts.day === endParts.day &&
+    startParts.month === endParts.month &&
+    startParts.year === endParts.year
+
+  if (sameDay) {
+    return `${formatThaiDate(start)} เวลา ${startParts.hour}:${startParts.minute} - ${endParts.hour}:${endParts.minute} น.`
+  }
+  return `${formatThaiDateTime(start)} - ${formatThaiDateTime(end)}`
 }
 
 export const STATUS_LABEL: Record<string, string> = {
@@ -123,7 +170,7 @@ export function buildStatusMessage(request: CarRequestPayload, statusLabel: stri
     `เลขที่เอกสาร: ${request.doc_number || '-'}`,
     `ผู้ขอ: ${request.requester_name || '-'}`,
     `ปลายทาง: ${request.destination || '-'} (${request.destination_province || '-'})`,
-    `วันเวลา: ${formatThaiDateTime(request.start_datetime)} - ${formatThaiTime(request.end_datetime)} น.`,
+    `วันเวลา: ${formatThaiDateTimeRange(request.start_datetime, request.end_datetime)}`,
     `สถานะล่าสุด: ${statusLabel}`,
   ].join('\n')
 }
@@ -131,7 +178,7 @@ export function buildStatusMessage(request: CarRequestPayload, statusLabel: stri
 export function buildDriverMessage(request: CarRequestPayload, carLabel: string) {
   return [
     '📋 งานใหม่ที่ได้รับมอบหมาย',
-    `วันที่: ${formatThaiDateTime(request.start_datetime)} - ${formatThaiTime(request.end_datetime)} น.`,
+    `วันเวลา: ${formatThaiDateTimeRange(request.start_datetime, request.end_datetime)}`,
     `ปลายทาง: ${request.destination || '-'} (${request.destination_province || '-'})`,
     `รถ: ${carLabel}`,
     `ผู้ขอ: ${request.requester_name || '-'}`,
