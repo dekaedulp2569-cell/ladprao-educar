@@ -38,18 +38,18 @@ export function generateForm3Html(request, car, driver, recipient) {
     request.approval_type === 'district_director' || request.is_out_of_bkk || request.is_out_of_hours
   const selectedRecipient =
     recipient || (isSpecialApproval ? OUT_OF_HOURS_RECIPIENT : BUSINESS_HOURS_RECIPIENT)
-  const requesterName = printable(request.requester_name || '............................................................')
-  const requesterPosition = printable(request.requester_position || '............................................................')
+  const requesterName = printable(request.requester_name || '')
+  const requesterPosition = printable(request.requester_position || '')
   const requesterDepartment = printable(
     request.requester_department || 'ฝ่ายการศึกษา สำนักงานเขตลาดพร้าว',
   )
   const destination = printable(request.destination || '')
   const province = request.destination_province ? ` (${printable(request.destination_province)})` : ''
-  const purpose = printable(request.purpose || '....................................................................................................')
+  const purpose = printable(request.purpose || '')
   const passengerCount = printable(request.passenger_count || 1)
   const carType = printable(car ? (CAR_TYPE[car.car_type] || 'รถตู้') : 'รถตู้')
-  const carPlate = printable(car?.license_plate || request.external_car_info || '................................................')
-  const driverName = printable(driver?.full_name || request.external_driver_name || '............................................................')
+  const carPlate = printable(car?.license_plate || request.external_car_info || '')
+  const driverName = printable(driver?.full_name || request.external_driver_name || '')
 
   return `<!DOCTYPE html>
 <html lang="th">
@@ -221,7 +221,17 @@ export function generateForm3Html(request, car, driver, recipient) {
     }
 
     .signature-line {
+      display: flex;
+      align-items: baseline;
+      width: 100%;
       white-space: nowrap;
+    }
+
+    .signature-leader {
+      flex: 1;
+      min-width: 4mm;
+      margin: 0 1mm;
+      border-bottom: 1px dotted #000;
     }
 
     .requester-signature {
@@ -236,8 +246,12 @@ export function generateForm3Html(request, car, driver, recipient) {
       text-align: left;
     }
 
-    .authority-signature {
+    .review-signature .signature-date {
       width: 98mm;
+    }
+
+    .authority-signature {
+      width: 160mm;
       margin-top: 8mm;
       margin-bottom: 0;
       text-align: left;
@@ -263,6 +277,11 @@ export function generateForm3Html(request, car, driver, recipient) {
       line-height: 1.3;
     }
 
+    .vehicle-type-line,
+    .license-plate-line {
+      padding-bottom: 0;
+    }
+
     .vehicle .driver-row {
       margin-top: 1mm;
     }
@@ -270,8 +289,9 @@ export function generateForm3Html(request, car, driver, recipient) {
     .signature-date {
       display: flex;
       align-items: baseline;
-      justify-content: center;
-      width: 100%;
+      justify-content: flex-end;
+      width: 100mm;
+      margin-left: auto !important;
       margin-top: calc(3 * 1.4em) !important;
       white-space: nowrap;
     }
@@ -279,6 +299,19 @@ export function generateForm3Html(request, car, driver, recipient) {
     .signature-date-spacer {
       display: inline-block;
       width: 10ch;
+    }
+
+    .signature-date-rule {
+      display: flex;
+      align-items: baseline;
+      flex: 1;
+      border-bottom: 1px dotted #000;
+      line-height: 1.4;
+    }
+
+    .signature-date-label {
+      flex: 0 0 auto;
+      padding-left: 1mm;
     }
 
     @media screen {
@@ -377,20 +410,30 @@ export function generateForm3Html(request, car, driver, recipient) {
     </section>
 
     <section class="signature review-signature">
-      <p class="signature-line">(ลงชื่อ)............................................................หัวหน้าฝ่ายหรือผู้แทน</p>
+      <p class="signature-line">
+        <span>ลงชื่อ</span><span class="signature-leader"></span><span>หัวหน้าฝ่ายหรือผู้แทน</span>
+      </p>
       <p class="signature-date">
-        <span>/</span><span class="signature-date-spacer"></span><span>/</span>
-        <span class="signature-date-spacer"></span><span>(วัน เดือน ปี)</span>
+        <span class="signature-date-rule">
+          <span>/</span><span class="signature-date-spacer"></span><span>/</span>
+          <span class="signature-date-spacer"></span>
+        </span>
+        <span class="signature-date-label">(วัน เดือน ปี)</span>
       </p>
     </section>
 
     <p class="approval-order">อนุญาต และพนักงานขับรถยนต์จัดทำแบบรายงานการใช้รถ (แบบ ๔) ให้เรียบร้อยด้วย</p>
 
     <section class="signature authority-signature">
-      <p class="signature-line">(ลงนามผู้มีอำนาจสั่งใช้รถ)............................................................</p>
+      <p class="signature-line">
+        <span>(ลงนามผู้มีอำนาจสั่งใช้รถ)</span><span class="signature-leader"></span>
+      </p>
       <p class="signature-date">
-        <span>/</span><span class="signature-date-spacer"></span><span>/</span>
-        <span class="signature-date-spacer"></span><span>(วัน เดือน ปี)</span>
+        <span class="signature-date-rule">
+          <span>/</span><span class="signature-date-spacer"></span><span>/</span>
+          <span class="signature-date-spacer"></span>
+        </span>
+        <span class="signature-date-label">(วัน เดือน ปี)</span>
       </p>
     </section>
   </main>
