@@ -33,8 +33,7 @@ export async function completeLineLogin() {
   }
 
   const { error: sessionError } = await supabase.auth.verifyOtp({
-    email: data.email,
-    token: data.hashedToken,
+    token_hash: data.hashedToken,
     type: 'magiclink',
   })
 
