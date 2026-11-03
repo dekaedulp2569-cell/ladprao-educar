@@ -247,7 +247,7 @@ export function generateForm3Html(request, car, driver, recipient) {
     }
 
     .review-signature .signature-date {
-      width: 62mm;
+      width: 82mm;
       margin-right: auto;
       margin-left: auto !important;
     }
@@ -265,7 +265,7 @@ export function generateForm3Html(request, car, driver, recipient) {
     }
 
     .authority-signature .signature-date {
-      width: 62mm;
+      width: 82mm;
     }
 
     .approval-order {
@@ -309,16 +309,8 @@ export function generateForm3Html(request, car, driver, recipient) {
 
     .signature-date-spacer {
       display: inline-block;
-      flex: 0 0 10ch;
-      width: 10ch;
-      height: 1.4em;
-      box-sizing: border-box;
-      border-bottom: 1px dotted #000;
-    }
-
-    .signature-date-day {
-      flex: 0 0 10ch;
-      width: 10ch;
+      flex: 0 0 7ch;
+      width: 7ch;
       height: 1.4em;
       box-sizing: border-box;
       border-bottom: 1px dotted #000;
@@ -327,7 +319,7 @@ export function generateForm3Html(request, car, driver, recipient) {
     .signature-date-rule {
       display: flex;
       align-items: baseline;
-      flex: 1;
+      flex: 0 0 auto;
       line-height: 1.4;
     }
 
@@ -438,7 +430,7 @@ export function generateForm3Html(request, car, driver, recipient) {
       <p class="signature-date">
         <span class="signature-date-rule">
           <span>/</span><span class="signature-date-spacer"></span><span>/</span>
-          <span class="signature-date-day"></span>
+          <span class="signature-date-spacer"></span>
         </span>
         <span class="signature-date-label">(วัน เดือน ปี)</span>
       </p>
@@ -453,7 +445,7 @@ export function generateForm3Html(request, car, driver, recipient) {
       <p class="signature-date">
         <span class="signature-date-rule">
           <span>/</span><span class="signature-date-spacer"></span><span>/</span>
-          <span class="signature-date-day"></span>
+          <span class="signature-date-spacer"></span>
         </span>
         <span class="signature-date-label">(วัน เดือน ปี)</span>
       </p>
