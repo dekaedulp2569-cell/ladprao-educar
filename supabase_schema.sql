@@ -71,6 +71,7 @@ CREATE TABLE car_requests (
     
     doc_type VARCHAR(20) CHECK (doc_type IN ('school_letter', 'dept_form')), -- ประเภทเอกสาร
     doc_number VARCHAR(100) NOT NULL,               -- เลขที่หนังสือ / เลขที่ใบขอใช้รถ
+    request_date DATE NOT NULL DEFAULT ((NOW() AT TIME ZONE 'Asia/Bangkok')::date), -- วันที่ผู้ขอยื่นคำขอ
 
     -- รายละเอียดการเดินทาง
     destination TEXT NOT NULL,                      -- สถานที่ไป / วัตถุประสงค์
@@ -94,7 +95,7 @@ CREATE TABLE car_requests (
     -- head_of_dept = หัวหน้าฝ่ายการศึกษา ปฏิบัติราชการแทน ผอ.เขต
     -- district_director = ผอ.เขตลาดพร้าว ปฏิบัติราชการแทน ปลัด กทม.
 
-    status VARCHAR(20) DEFAULT 'pending' CHECK (status IN ('pending', 'tentative', 'approved', 'rejected')),
+    status VARCHAR(20) DEFAULT 'pending' CHECK (status IN ('pending', 'tentative', 'approved', 'rejected', 'cancelled')),
     director_approval_status VARCHAR(20) DEFAULT 'not_required' CHECK (director_approval_status IN ('not_required', 'pending', 'approved', 'rejected')),
 
     created_at TIMESTAMPTZ DEFAULT NOW(),

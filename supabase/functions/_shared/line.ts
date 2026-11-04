@@ -183,6 +183,7 @@ export const STATUS_LABEL: Record<string, string> = {
   tentative: 'รอ ผอ.เขต อนุมัติ',
   approved: 'อนุมัติแล้ว (ล็อกคิว)',
   rejected: 'ไม่อนุมัติ',
+  cancelled: 'ยกเลิกคำขอใช้รถ',
 }
 
 export type CarRequestPayload = {

@@ -31,7 +31,9 @@ function dateValue(parts) {
 export function generateForm3Html(request, car, driver, recipient) {
   if (!request) return ''
 
-  const requestedOn = dateValue(bangkokParts(request.created_at || new Date()))
+  const requestedOn = dateValue(
+    bangkokParts(request.request_date || request.created_at || new Date()),
+  )
   const startsAt = dateValue(bangkokParts(request.start_datetime))
   const endsAt = dateValue(bangkokParts(request.end_datetime))
   const isSpecialApproval =

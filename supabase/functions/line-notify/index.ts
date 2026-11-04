@@ -38,7 +38,16 @@ function statusFlex(request: CarRequestPayload, statusLabel: string, assignment?
 
   return {
     type: 'bubble',
-    styles: { header: { backgroundColor: request.status === 'approved' ? '#B45309' : '#F59E0B' } },
+    styles: {
+      header: {
+        backgroundColor:
+          request.status === 'cancelled'
+            ? '#B91C1C'
+            : request.status === 'approved'
+              ? '#B45309'
+              : '#F59E0B',
+      },
+    },
     header: {
       type: 'box',
       layout: 'vertical',
@@ -166,6 +175,62 @@ Deno.serve(async (req) => {
   const canManageRequest =
     profile.role === 'admin' ||
     (profile.role === 'head_of_dept' && request.approval_type === 'head_of_dept')
+
+  if (request.status === 'cancelled') {
+    if (profile.role !== 'admin' && request.requester_auth_user_id !== authData.user.id) {
+      return json({ error: 'Only the requester or an admin can notify this cancellation' }, 403)
+    }
+
+    const [{ data: requester, error: requesterError }, { data: driver, error: driverError }, { data: car, error: carError }] =
+      await Promise.all([
+        admin
+          .from('user_profiles')
+          .select('line_user_id')
+          .eq('auth_user_id', request.requester_auth_user_id)
+          .maybeSingle(),
+        request.assigned_driver_id
+          ? admin
+              .from('drivers')
+              .select('full_name, phone, line_user_id')
+              .eq('id', request.assigned_driver_id)
+              .maybeSingle()
+          : Promise.resolve({ data: null, error: null }),
+        request.assigned_car_id
+          ? admin.from('cars').select('license_plate, car_type').eq('id', request.assigned_car_id).maybeSingle()
+          : Promise.resolve({ data: null, error: null }),
+      ])
+    if (requesterError || driverError || carError) {
+      return json({ error: 'Unable to load cancellation notification details' }, 500)
+    }
+
+    const carLabel = request.external_car_info ||
+      (car ? `${car.license_plate} (${car.car_type || 'รถ'})` : 'ไม่ระบุรถ')
+    const cancellationMessage = statusFlex(
+      request as CarRequestPayload,
+      'ยกเลิกคำขอใช้รถ',
+      {
+        carLabel,
+        driverName: request.external_driver_name || driver?.full_name,
+        driverPhone: driver?.phone,
+      },
+    )
+    const targets = new Map<string, string>([[groupId(), 'กลุ่มฝ่ายการศึกษา']])
+    const missingRecipients: string[] = []
+    if (requester?.line_user_id) targets.set(requester.line_user_id, 'ผู้ขอ')
+    else missingRecipients.push('ผู้ขอ (ไม่พบ LINE User ID)')
+    if (driver?.line_user_id) targets.set(driver.line_user_id, 'พนักงานขับรถ')
+    else if (request.assigned_driver_id) missingRecipients.push('พนักงานขับรถ (ไม่พบ LINE User ID)')
+
+    const notifications = await Promise.all(
+      [...targets].map(async ([recipient, label]) => ({
+        target: label,
+        result: await pushFlex(recipient, 'แจ้งยกเลิกคำขอใช้รถที่อนุมัติแล้ว', cancellationMessage),
+      })),
+    )
+    const failed = missingRecipients.length > 0 || notifications.some(({ result }) => !result.ok)
+    return json({ notifications, missingRecipients }, failed ? 502 : 200)
+  }
+
   if (!canManageRequest && request.requester_auth_user_id !== authData.user.id) {
     return json({ error: 'You cannot notify for this request' }, 403)
   }

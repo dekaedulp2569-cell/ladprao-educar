@@ -6,6 +6,7 @@ export function StatusBadge({ status, className }) {
     tentative: { label: 'รอ ผอ.เขต อนุมัติ', cls: 'bg-amber-50 text-amber-700 border-amber-200', dot: 'bg-amber-500' },
     approved: { label: 'อนุมัติแล้ว (ล็อกคิว)', cls: 'bg-emerald-50 text-emerald-700 border-emerald-200', dot: 'bg-emerald-500' },
     rejected: { label: 'ไม่อนุมัติ', cls: 'bg-rose-50 text-rose-700 border-rose-200', dot: 'bg-rose-500' },
+    cancelled: { label: 'ยกเลิกแล้ว', cls: 'bg-slate-100 text-slate-600 border-slate-300', dot: 'bg-slate-500' },
   }
   const item = map[status] || { label: status || '-', cls: 'bg-slate-100 text-slate-600 border-slate-200', dot: 'bg-slate-400' }
   return (

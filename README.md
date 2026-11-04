@@ -10,14 +10,14 @@
 | ฟีเจอร์ | รายละเอียด |
 |---|---|
 | ปฏิทินสาธารณะ | ดูรายการใช้รถรายเดือน/รายวัน เลือกดูตามคันรถ ไม่ต้อง Login (Read-Only) |
-| ยื่นคำขอใช้รถ | เลือกประเภทเอกสาร + เลขที่, ข้อมูลผู้ขอ, วันเวลา, ปลายทาง/จังหวัด, จำนวนคน, วัตถุประสงค์ |
+| ยื่นคำขอใช้รถ | เลือกประเภทเอกสาร + เลขที่, วันที่ยื่นคำขอ (ตั้งต้นเป็นวันที่ปัจจุบัน พ.ศ. และแก้ไขได้), ข้อมูลผู้ขอ, วันเวลา, ปลายทาง/จังหวัด, จำนวนคน, วัตถุประสงค์ |
 | ตรวจเงื่อนไขอัตโนมัติ | นอกเวลา 08:00–16:00 น. หรือจังหวัด ≠ กรุงเทพมหานคร → เสนอ ผอ.เขต (สถานะ `tentative`) |
 | อนุมัติ 2 ระดับ | ปกติ: หัวหน้าฝ่ายการศึกษา (ปฏิบัติราชการแทน ผอ.เขต) / พิเศษ: ผอ.เขตลาดพร้าว (ปฏิบัติราชการแทน ปลัด กทม.) |
 | แดชบอร์ด Admin | จัดการคิว, จัดสรรรถ (รถตู้/กระบะ/รถยืม), จัดสรรคนขับ (ฝ่ายเรา/ฝ่ายอื่น), เปลี่ยนสถานะ, ตรวจการจองซ้ำ |
 | คำขอของฉัน | ผู้ขอติดตามสถานะคำขอของตนเอง |
 | ตารางงานคนขับ | คนขับฝ่ายเราเห็นงานส่วนตัว, คนขับฝ่ายอื่นถูกบันทึกชื่อและแจ้งผ่านกลุ่มกลาง |
 | รายงาน | ส่งออก CSV ตามปีงบประมาณ (1 ต.ค.–30 ก.ย.) และล้างข้อมูลย้อนหลัง 2 ปี |
-| LINE | แจ้งสถานะผู้ขอ, แจ้งงานคนขับฝ่ายเราแบบส่วนตัว, สรุปงาน 16:30 น. (ผ่าน Supabase Edge Functions) |
+| LINE | แจ้งสถานะผู้ขอ, แจ้งงานคนขับฝ่ายเราแบบส่วนตัว, สรุปงาน 15:00 น. (ผ่าน Supabase Edge Functions) |
 
 ## เทคโนโลยี
 
@@ -77,7 +77,7 @@ src/
 supabase/
   functions/line-auth/      # ตรวจสอบ LINE ID token และออก Supabase session
   functions/line-notify/     # แจ้งเตือน LINE
-  functions/daily-summary/   # สรุปงาน 16:30 น.
+  functions/daily-summary/   # สรุปงาน 15:00 น.
   migrations/                # RLS และ schema สำหรับ LINE Login
   rls_demo.sql               # RLS โหมด Demo
   schema.sql                 # สร้างตาราง (อ้างอิง)
@@ -86,11 +86,11 @@ supabase/
 
 ## LINE Login และการอนุมัติบัญชี
 
-ผู้ใช้เข้าสู่ระบบผ่าน LIFF; Edge Function `line-auth` ตรวจสอบ LINE ID token กับ LINE ก่อนเชื่อมบัญชี Supabase Auth โปรไฟล์ใหม่จะเริ่มเป็น `pending` และเข้าใช้งานส่วนที่ต้องยืนยันตัวตนไม่ได้จนกว่าผู้ดูแลจะอนุมัติ
+ผู้ใช้เข้าสู่ระบบผ่าน LIFF; Edge Function `line-auth` ตรวจสอบ LINE ID token กับ LINE ก่อนเชื่อมบัญชี Supabase Auth โปรไฟล์ใหม่จะเริ่มเป็น `requester` และใช้งานได้ทันที ผู้ดูแลระบบคนแรกต้องกำหนดบทบาท `admin` ด้วยตนเองใน Supabase
 
 ก่อนเปิดระบบ ให้ดำเนินการใน Supabase:
 
-1. รัน `supabase/migrations/20261104000000_line_login_access.sql` ใน SQL Editor เพื่อเพิ่มคอลัมน์บัญชี/สถานะและจำกัด RLS (migration นี้ปิด Demo policies เดิม)
+1. รัน migration ตามลำดับใน SQL Editor: `20261104000000_line_login_access.sql`, `20261104010000_workflow_approval_roles.sql` และ `20261104220000_add_request_date.sql` เพื่อเพิ่มข้อมูลบัญชี/วันที่ยื่นคำขอและจำกัด RLS (migration แรกปิด Demo policies เดิม)
 2. ในโฟลเดอร์โปรเจกต์ รันคำสั่งต่อไปนี้ (ต้องติดตั้ง Supabase CLI และมีสิทธิ์โปรเจกต์):
 
    ```powershell
@@ -103,13 +103,14 @@ supabase/
 
    `LINE_LOGIN_CHANNEL_ID` คือ ID ของ LINE Login channel ไม่ใช่ LIFF ID หรือ Messaging API token ตรวจว่า `supabase/config.toml` ถูกนำไปใช้ในการ deploy
 3. ตั้ง LIFF Endpoint URL เป็น `https://dekaedulp2569-cell.github.io/ladprao-educar/` พร้อม scope `openid` และ `profile`
-4. Push frontend ไป `main` เพื่อ deploy ผ่าน GitHub Actions แล้วให้บัญชีผู้ดูแลคนแรกลงชื่อเข้า LINE หนึ่งครั้ง ระบบจะสร้างโปรไฟล์ `pending`
-5. ตรวจสอบ LINE User ID ของผู้ดูแลคนแรกใน SQL Editor:
+4. รัน `supabase/migrations/20261104223000_request_cancellation.sql` หลัง migration อื่น เพื่อเปิดสถานะยกเลิกและสิทธิ์ยกเลิกคำขอที่อนุมัติแล้ว
+5. Push frontend ไป `main` เพื่อ deploy ผ่าน GitHub Actions แล้วให้บัญชีผู้ดูแลคนแรกลงชื่อเข้า LINE หนึ่งครั้ง ระบบจะสร้างโปรไฟล์ `requester` ที่เปิดใช้งานได้ทันที
+6. ตรวจสอบ LINE User ID ของผู้ดูแลคนแรกใน SQL Editor:
 
    ```sql
-   select id, full_name, line_user_id, approval_status
+   select id, full_name, line_user_id, role, approval_status
    from public.user_profiles
-   where approval_status = 'pending'
+   where role = 'requester'
    order by created_at desc;
    ```
 
@@ -121,7 +122,7 @@ supabase/
    where line_user_id = '<LINE_USER_ID>';
    ```
 
-6. ให้ผู้ดูแลกด “ตรวจสอบสถานะอีกครั้ง” แล้วตรวจ/อนุมัติสมาชิกใหม่จากเมนูจัดการสมาชิก
+7. ให้ผู้ดูแลเปลี่ยนบทบาทบัญชีแรกเป็น `admin` ใน SQL Editor แล้วจัดการบทบาทสมาชิกที่เหลือจากเมนูสมาชิก
 
 บัญชีใหม่จะผูก LINE User ID อัตโนมัติ แต่ข้อมูลตำแหน่งและสังกัดต้องให้ผู้ดูแลแก้ไขก่อนหรือหลังอนุมัติ ห้ามส่ง Channel secret, Channel access token หรือ service role key ผ่านแชต/commit; ค่าเหล่านั้นต้องอยู่ใน Supabase Secrets เท่านั้น
 
@@ -133,8 +134,8 @@ supabase/
 
 | บทบาท | สิทธิ์ |
 |---|---|
-| เจ้าหน้าที่ผู้ขอใช้รถ (`requester`) | ยื่นคำขอ, ดูคำขอของตนเอง |
-| เจ้าหน้าที่จัดการรถ (`admin`) | จัดการทุกคำขอ, จัดสรรรถ/คนขับ, อนุมัติ, export/purge |
+| เจ้าหน้าที่ผู้ขอใช้รถ (`requester`) | ยื่นคำขอ, ดูคำขอของตนเอง, ยกเลิกคำขอที่อนุมัติแล้ว พร้อมแจ้งผู้เกี่ยวข้องและกลุ่มฝ่าย |
+| เจ้าหน้าที่จัดการรถ (`admin`) | จัดการทุกคำขอ, จัดสรรรถ/คนขับ, อนุมัติ/ยกเลิก, export/purge |
 | หัวหน้าฝ่ายการศึกษา (`head_of_dept`) | เข้าแดชบอร์ดจัดการและอนุมัติได้ |
 | พนักงานขับรถ (`driver`) | ดูตารางงานของตนเอง (เลือกชื่อจากตาราง `drivers`) |
 
@@ -193,6 +194,6 @@ supabase functions deploy daily-summary
 1. **เปลี่ยนระบบ Login** เป็น LINE Login (LIFF) หรือ Supabase Auth และผูก `user_profiles.line_user_id`
 2. **เปลี่ยน RLS** จาก `demo_all_*` เป็น policy ตามบทบาท/เจ้าของข้อมูล เพื่อไม่ให้ anon key อ่าน/เขียนได้ทุกอย่าง
 3. **ยืนยันตัวตนผู้อนุมัติ** ก่อนอนุญาตให้เปลี่ยนสถานะเป็น `approved`
-4. **Deploy Edge Functions + ตั้ง secrets LINE** และตั้ง pg_cron สำหรับสรุปงาน 16:30 น.
+4. **Deploy Edge Functions + ตั้ง secrets LINE** และตั้ง pg_cron สำหรับสรุปงาน 15:00 น.
 5. **Rate limit / audit log** การเรียก Edge Function และการแก้ไขสถานะ
 6. **สำรองข้อมูล** ก่อนใช้ปุ่มล้างข้อมูลย้อนหลัง 2 ปี

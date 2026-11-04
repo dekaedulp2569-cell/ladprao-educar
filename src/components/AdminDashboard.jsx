@@ -27,6 +27,7 @@ const STATUS_TABS = [
   { value: 'tentative', label: 'รอ ผอ.เขต' },
   { value: 'approved', label: 'อนุมัติแล้ว' },
   { value: 'rejected', label: 'ไม่อนุมัติ' },
+  { value: 'cancelled', label: 'ยกเลิกแล้ว' },
 ]
 
 export function AdminDashboard() {
@@ -79,7 +80,7 @@ export function AdminDashboard() {
         acc[item.status] = (acc[item.status] || 0) + 1
         return acc
       },
-      { pending: 0, tentative: 0, approved: 0, rejected: 0 },
+      { pending: 0, tentative: 0, approved: 0, rejected: 0, cancelled: 0 },
     )
   }, [requests])
 
@@ -212,6 +213,29 @@ export function AdminDashboard() {
     }
   }
 
+  const cancelApprovedRequest = async (request) => {
+    if (!isAdmin || request.status !== 'approved') {
+      setError('เฉพาะ Admin สามารถยกเลิกคำขอที่อนุมัติแล้วได้')
+      return
+    }
+
+    const confirmed = window.confirm(
+      `ยืนยันยกเลิกคำขอใช้รถเลขที่ ${request.doc_number || '-'} ที่ได้รับอนุมัติแล้วหรือไม่?\nระบบจะแจ้งผู้ขอ คนขับที่ได้รับมอบหมาย และกลุ่มฝ่ายการศึกษา`,
+    )
+    if (!confirmed) return
+
+    const saved = await updateRequest(request.id, { status: 'cancelled' })
+    if (!saved) return
+
+    const notification = await notifyLine({
+      type: 'status',
+      request: { ...request, status: 'cancelled' },
+    })
+    if (notification?.ok === false || notification?.skipped) {
+      setError('ยกเลิกคำขอแล้ว แต่ส่งการแจ้งเตือน LINE ไม่สำเร็จ กรุณาแจ้งกลุ่มฝ่ายด้วยตนเอง')
+    }
+  }
+
   const saveAllocation = async (request, allocation) => {
     if (!isAdmin) {
       setError('เฉพาะผู้ดูแลระบบเท่านั้นที่จัดสรรรถและพนักงานขับรถได้')
@@ -317,11 +341,12 @@ export function AdminDashboard() {
 
       {error ? <Alert tone="danger">{error}</Alert> : null}
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
         <StatCard label="รอตรวจสอบ" value={counts.pending} tone="brand" />
         <StatCard label="รอ ผอ.เขต อนุมัติ" value={counts.tentative} tone="amber" />
         <StatCard label="อนุมัติแล้ว" value={counts.approved} tone="emerald" />
         <StatCard label="ไม่อนุมัติ" value={counts.rejected} tone="rose" />
+        <StatCard label="ยกเลิกแล้ว" value={counts.cancelled} tone="slate" />
       </div>
 
       <div className="flex flex-wrap gap-2 rounded-2xl border border-slate-200 bg-white p-1.5">
@@ -440,8 +465,10 @@ export function AdminDashboard() {
         onClose={() => setSelected(null)}
         onApprove={approve}
         onReject={reject}
+        onCancel={cancelApprovedRequest}
         onSaveAllocation={saveAllocation}
-        canManageAllocation={isAdmin}
+        canManageAllocation={isAdmin && selected?.status !== 'cancelled'}
+        canCancelRequest={isAdmin}
         canReviewRequest={
           isAdmin ||
           (isHeadOfDept &&
@@ -472,6 +499,7 @@ function StatCard({ label, value, tone }) {
     amber: 'bg-amber-50 text-amber-700 ring-amber-100',
     emerald: 'bg-emerald-50 text-emerald-700 ring-emerald-100',
     rose: 'bg-rose-50 text-rose-700 ring-rose-100',
+    slate: 'bg-slate-100 text-slate-700 ring-slate-200',
   }
   return (
     <div className={classNames('rounded-2xl p-4 ring-1', tones[tone])}>
@@ -557,8 +585,10 @@ function RequestDetail({
   onClose,
   onApprove,
   onReject,
+  onCancel,
   onSaveAllocation,
   canManageAllocation,
+  canCancelRequest,
   canReviewRequest,
   onPrint,
 }) {
@@ -620,6 +650,7 @@ function RequestDetail({
           <Info label="ตำแหน่ง" value={request.requester_position} />
           <Info label="สังกัด" value={request.requester_department} />
           <Info label="โทรศัพท์" value={request.phone || '-'} />
+          <Info label="วันที่ยื่นคำขอ" value={formatDate(request.request_date || request.created_at)} />
           <Info label="วันเวลาเริ่มต้น" value={formatDate(request.start_datetime, true)} />
           <Info label="วันเวลาสิ้นสุด" value={formatDate(request.end_datetime, true)} />
           <Info
@@ -779,6 +810,18 @@ function RequestDetail({
               className="flex-1 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700 transition hover:bg-rose-100 disabled:opacity-60"
             >
               ไม่อนุมัติ
+            </button>
+          </div>
+        ) : null}
+        {canCancelRequest && request.status === 'approved' ? (
+          <div className="border-t border-slate-200 pt-4">
+            <button
+              type="button"
+              onClick={() => onCancel(request)}
+              disabled={busy}
+              className="w-full rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700 transition hover:bg-rose-100 disabled:opacity-60"
+            >
+              ยกเลิกคำขอที่อนุมัติแล้ว และแจ้งผู้เกี่ยวข้อง
             </button>
           </div>
         ) : null}

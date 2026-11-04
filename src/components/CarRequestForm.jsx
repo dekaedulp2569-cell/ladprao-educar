@@ -10,6 +10,9 @@ import {
   includesWeekend,
   isOutOfBkk,
   isOutOfHours,
+  dateKey,
+  THAI_MONTHS_LONG,
+  toThaiDigits,
   toISO,
 } from '../lib/helpers'
 import { Alert, Card, SectionTitle } from './ui'
@@ -17,6 +20,7 @@ import { OfficialCarFormModal } from './OfficialCarFormModal'
 import { openForm3PrintWindow } from '../lib/printForm3'
 
 const emptyForm = {
+  request_date: '',
   doc_type: 'school_letter',
   doc_number: '',
   requester_name: '',
@@ -36,6 +40,7 @@ export function CarRequestForm({ onSubmitted }) {
   const { session } = useAuth()
   const [form, setForm] = useState(() => ({
     ...emptyForm,
+    request_date: dateKey(new Date()),
     requester_name: session?.name || '',
     requester_position: session?.position || '',
     requester_department: session?.department || emptyForm.requester_department,
@@ -61,6 +66,22 @@ export function CarRequestForm({ onSubmitted }) {
 
   const validation = () => {
     const nextErrors = {}
+    if (!form.request_date) {
+      nextErrors.request_date = 'เลือกวันที่ยื่นคำขอ'
+    } else {
+      const [year, month, day] = form.request_date.split('-').map(Number)
+      const parsed = new Date(Date.UTC(year, month - 1, day))
+      if (
+        !year ||
+        !month ||
+        !day ||
+        parsed.getUTCFullYear() !== year ||
+        parsed.getUTCMonth() !== month - 1 ||
+        parsed.getUTCDate() !== day
+      ) {
+        nextErrors.request_date = 'วันที่ยื่นคำขอไม่ถูกต้อง'
+      }
+    }
     if (!form.doc_number.trim()) nextErrors.doc_number = 'ระบุเลขที่หนังสือหรือใบขอใช้รถ'
     if (!form.requester_name.trim()) nextErrors.requester_name = 'ระบุชื่อ-สกุลผู้ขอ'
     if (!form.requester_position.trim()) nextErrors.requester_position = 'ระบุตำแหน่ง'
@@ -88,6 +109,7 @@ export function CarRequestForm({ onSubmitted }) {
     setSubmitting(true)
     const payload = {
       requester_auth_user_id: session.userId,
+      request_date: form.request_date,
       doc_type: form.doc_type,
       doc_number: form.doc_number.trim(),
       requester_name: form.requester_name.trim(),
@@ -125,6 +147,7 @@ export function CarRequestForm({ onSubmitted }) {
     setSubmitted({ ...payload, ...(data || {}) })
     setForm((current) => ({
       ...emptyForm,
+      request_date: dateKey(new Date()),
       requester_name: current.requester_name,
       requester_position: current.requester_position,
       requester_department: current.requester_department,
@@ -146,6 +169,10 @@ export function CarRequestForm({ onSubmitted }) {
   if (submitted) {
     const approval = APPROVAL_TYPE[submitted.approval_type]
     const tentative = submitted.status === 'tentative'
+    const [requestYear, requestMonth, requestDay] = (submitted.request_date || '').split('-').map(Number)
+    const requestDateLabel = requestYear && requestMonth && requestDay
+      ? `วันที่ ${toThaiDigits(requestDay)} เดือน ${THAI_MONTHS_LONG[requestMonth - 1]} พ.ศ. ${toThaiDigits(requestYear + 543)}`
+      : 'ไม่ระบุวันที่ยื่นคำขอ'
     const specialReasons = [
       submitted.is_out_of_bkk ? 'ออกนอกกรุงเทพมหานคร' : null,
       submitted.is_out_of_hours ? 'นอกเวลาราชการ' : null,
@@ -169,6 +196,10 @@ export function CarRequestForm({ onSubmitted }) {
               <div className="rounded-xl bg-slate-50 px-4 py-3">
                 <p className="text-xs text-slate-500">เลขที่เอกสาร</p>
                 <p className="font-semibold text-slate-800">{submitted.doc_number}</p>
+              </div>
+              <div className="rounded-xl bg-slate-50 px-4 py-3">
+                <p className="text-xs text-slate-500">วันที่ยื่นคำขอ</p>
+                <p className="font-semibold text-slate-800">{requestDateLabel}</p>
               </div>
               <div className="rounded-xl bg-slate-50 px-4 py-3">
                 <p className="text-xs text-slate-500">สถานะ</p>
@@ -295,6 +326,25 @@ export function CarRequestForm({ onSubmitted }) {
                 placeholder="เช่น ที่ กท 1234/2569"
                 className={inputClass}
               />
+            </Field>
+            <Field label="วันที่ยื่นคำขอ (วัน / เดือน / พ.ศ.)" required error={errors.request_date}>
+              <div className="space-y-2">
+                <input
+                  type="date"
+                  value={form.request_date}
+                  onChange={(event) => update('request_date', event.target.value)}
+                  className={inputClass}
+                />
+                <p className="text-xs text-slate-600" aria-live="polite">
+                  {(() => {
+                    const [year, month, day] = (form.request_date || '').split('-').map(Number)
+                    if (!year || !month || !day || !THAI_MONTHS_LONG[month - 1]) {
+                      return 'เลือกวันที่ เดือน และปี พ.ศ.'
+                    }
+                    return `วันที่ ${toThaiDigits(day)} เดือน ${THAI_MONTHS_LONG[month - 1]} พ.ศ. ${toThaiDigits(year + 543)}`
+                  })()}
+                </p>
+              </div>
             </Field>
             <label className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50/60 p-3 text-sm text-slate-700 sm:col-span-2">
               <input

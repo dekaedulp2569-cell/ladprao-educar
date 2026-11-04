@@ -14,7 +14,10 @@ export function OfficialCarFormModal({ open, onClose, request, car, driver }) {
       : defaultRecipient
 
   // แยกส่วนประกอบวันเวลาไทย
-  const reqParts = useMemo(() => bangkokParts(request?.created_at), [request?.created_at])
+  const reqParts = useMemo(
+    () => bangkokParts(request?.request_date || request?.created_at),
+    [request?.request_date, request?.created_at],
+  )
   const startParts = useMemo(() => bangkokParts(request?.start_datetime), [request?.start_datetime])
   const endParts = useMemo(() => bangkokParts(request?.end_datetime), [request?.end_datetime])
 

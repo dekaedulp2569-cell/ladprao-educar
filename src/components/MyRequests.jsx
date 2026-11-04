@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
-import { APPROVAL_TYPE, formatDateTimeRange } from '../lib/helpers'
+import { APPROVAL_TYPE, formatDate, formatDateTimeRange } from '../lib/helpers'
+import { notifyLine } from '../lib/line'
 import { Card, EmptyState, SectionTitle, Spinner, StatusBadge } from './ui'
 import { OfficialCarFormModal } from './OfficialCarFormModal'
 import { openForm3PrintWindow } from '../lib/printForm3'
@@ -14,6 +15,47 @@ export function MyRequests() {
   const [printRequest, setPrintRequest] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [cancellingId, setCancellingId] = useState(null)
+
+  const cancelApprovedRequest = async (request) => {
+    const confirmed = window.confirm(
+      `ยืนยันยกเลิกคำขอใช้รถเลขที่ ${request.doc_number || '-'} ที่ได้รับอนุมัติแล้วหรือไม่?\nระบบจะแจ้งผู้ขอ คนขับที่ได้รับมอบหมาย และกลุ่มฝ่ายการศึกษา`,
+    )
+    if (!confirmed) return
+
+    setError('')
+    setCancellingId(request.id)
+    const { data: cancelledRequest, error: cancelError } = await supabase
+      .from('car_requests')
+      .update({ status: 'cancelled', updated_at: new Date().toISOString() })
+      .eq('id', request.id)
+      .eq('requester_auth_user_id', session.userId)
+      .eq('status', 'approved')
+      .select('id')
+      .maybeSingle()
+
+    if (cancelError) {
+      setError(`ยกเลิกคำขอไม่สำเร็จ: ${cancelError.message}`)
+      setCancellingId(null)
+      return
+    }
+    if (!cancelledRequest) {
+      setError('ยกเลิกคำขอไม่สำเร็จ: รายการนี้ไม่อยู่ในสถานะอนุมัติแล้ว หรือบัญชีนี้ไม่มีสิทธิ์')
+      setCancellingId(null)
+      return
+    }
+
+    const cancelled = { ...request, status: 'cancelled' }
+    setRequests((current) =>
+      current.map((item) => (item.id === request.id ? cancelled : item)),
+    )
+    setCancellingId(null)
+
+    const notification = await notifyLine({ type: 'status', request: cancelled })
+    if (notification?.ok === false || notification?.skipped) {
+      setError('ยกเลิกคำขอแล้ว แต่ส่งการแจ้งเตือน LINE ไม่สำเร็จ กรุณาแจ้งกลุ่มฝ่ายด้วยตนเอง')
+    }
+  }
 
   useEffect(() => {
     const load = async () => {
@@ -65,11 +107,12 @@ export function MyRequests() {
         <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{error}</div>
       ) : null}
 
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
         <SummaryCard label="รอตรวจสอบ" value={summary.pending} className="bg-brand-50 text-brand-800" />
         <SummaryCard label="รอ ผอ.เขต" value={summary.tentative} className="bg-amber-50 text-amber-700" />
         <SummaryCard label="อนุมัติแล้ว" value={summary.approved} className="bg-emerald-50 text-emerald-700" />
         <SummaryCard label="ไม่อนุมัติ" value={summary.rejected} className="bg-rose-50 text-rose-700" />
+        <SummaryCard label="ยกเลิกแล้ว" value={summary.cancelled} className="bg-slate-100 text-slate-600" />
       </div>
 
       <Card className="p-4 sm:p-5">
@@ -94,6 +137,7 @@ export function MyRequests() {
                     <StatusBadge status={request.status} />
                   </div>
                   <div className="mt-2 grid gap-1 text-xs text-slate-500 sm:grid-cols-2">
+                    <p>📝 วันที่ยื่นคำขอ: {formatDate(request.request_date || request.created_at)}</p>
                     <p className="sm:col-span-2">📅 {formatDateTimeRange(request.start_datetime, request.end_datetime)}</p>
                     <p>👥 ผู้โดยสาร {request.passenger_count} คน</p>
                     <p>✍️ {approval.label} ({approval.line})</p>
@@ -104,9 +148,17 @@ export function MyRequests() {
                     </p>
                   ) : null}
                   {request.status === 'approved' ? (
-                    <p className="mt-2 rounded-lg bg-emerald-50 px-3 py-2 text-xs text-emerald-700">
-                      อนุมัติเรียบร้อยและล็อกคิวรถแล้ว
-                    </p>
+                    <div className="mt-2 flex flex-wrap items-center justify-between gap-2 rounded-lg bg-emerald-50 px-3 py-2">
+                      <p className="text-xs text-emerald-700">อนุมัติเรียบร้อยและล็อกคิวรถแล้ว</p>
+                      <button
+                        type="button"
+                        onClick={() => void cancelApprovedRequest(request)}
+                        disabled={cancellingId === request.id}
+                        className="rounded-lg border border-rose-200 bg-white px-3 py-1.5 text-xs font-semibold text-rose-700 transition hover:bg-rose-50 disabled:opacity-60"
+                      >
+                        {cancellingId === request.id ? 'กำลังยกเลิก...' : 'ยกเลิกคำขอ'}
+                      </button>
+                    </div>
                   ) : null}
                   <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-3">
                     <span className="text-xs text-slate-400 font-mono">

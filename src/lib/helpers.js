@@ -25,6 +25,12 @@ export const STATUS = {
     className: 'bg-rose-50 text-rose-700 border-rose-200',
     dot: 'bg-rose-500',
   },
+  cancelled: {
+    label: 'ยกเลิกแล้ว',
+    short: 'ยกเลิกแล้ว',
+    className: 'bg-slate-100 text-slate-600 border-slate-300',
+    dot: 'bg-slate-500',
+  },
 }
 
 export const APPROVAL_TYPE = {
