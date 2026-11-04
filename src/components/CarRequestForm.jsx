@@ -50,6 +50,7 @@ export function CarRequestForm({ onSubmitted }) {
   const [submitted, setSubmitted] = useState(null)
   const [showPrintForm, setShowPrintForm] = useState(false)
   const [serverError, setServerError] = useState('')
+  const [lineNotification, setLineNotification] = useState(null)
 
   const update = (field, value) => {
     setForm((current) => ({ ...current, [field]: value }))
@@ -154,16 +155,25 @@ export function CarRequestForm({ onSubmitted }) {
       phone: current.phone,
     }))
 
-    // แจ้งเตือน LINE แบบไม่บล็อกการทำงานของฟอร์ม (ถ้ายังไม่ deploy Edge Function จะข้ามไป)
+    // บันทึกคำขอก่อน แล้วรายงานผลการส่ง LINE แยกจากผลการบันทึก
     const saved = { ...payload, ...(data || {}) }
     const statusLabel =
       saved.status === 'tentative' ? 'รอ ผอ.เขต อนุมัติ' : 'รอตรวจสอบ'
-    void notifyLine({
+    const notification = await notifyLine({
       type: 'status',
       statusLabel,
       request: saved,
       text: buildStatusMessage(saved, statusLabel),
     })
+    setLineNotification(
+      notification?.ok
+        ? { ok: true, message: 'ส่งข้อความยืนยันไปยัง LINE ของคุณและกลุ่มฝ่ายแล้ว' }
+        : {
+            ok: false,
+            message:
+              'บันทึกคำขอแล้ว แต่ส่ง LINE ยืนยันไม่สำเร็จ กรุณาตรวจการตั้งค่า LINE และแจ้งผู้ดูแลระบบ',
+          },
+    )
   }
 
   if (submitted) {
@@ -188,10 +198,22 @@ export function CarRequestForm({ onSubmitted }) {
             </div>
             <h2 className="text-xl font-bold sm:text-2xl">ส่งคำขอใช้รถเรียบร้อยแล้ว</h2>
             <p className="mt-1 text-sm text-emerald-50">
-              ระบบบันทึกคำขอและแจ้งผู้เกี่ยวข้องตามลำดับขั้นตอนแล้ว
+              ระบบบันทึกคำขอเรียบร้อยแล้ว
             </p>
           </div>
           <div className="space-y-4 p-6">
+            {lineNotification ? (
+              <div
+                role="status"
+                className={`rounded-xl border px-4 py-3 text-sm ${
+                  lineNotification.ok
+                    ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
+                    : 'border-amber-200 bg-amber-50 text-amber-800'
+                }`}
+              >
+                {lineNotification.message}
+              </div>
+            ) : null}
             <div className="grid gap-3 text-sm sm:grid-cols-2">
               <div className="rounded-xl bg-slate-50 px-4 py-3">
                 <p className="text-xs text-slate-500">เลขที่เอกสาร</p>
@@ -267,7 +289,10 @@ export function CarRequestForm({ onSubmitted }) {
             <div className="flex flex-col gap-2 sm:flex-row">
               <button
                 type="button"
-                onClick={() => setSubmitted(null)}
+                onClick={() => {
+                  setSubmitted(null)
+                  setLineNotification(null)
+                }}
                 className="flex-1 rounded-xl bg-slate-800 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-900"
               >
                 ยื่นคำขอใหม่
@@ -276,6 +301,7 @@ export function CarRequestForm({ onSubmitted }) {
                 type="button"
                 onClick={() => {
                   setSubmitted(null)
+                  setLineNotification(null)
                   if (onSubmitted) onSubmitted(null, 'calendar')
                 }}
                 className="flex-1 rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"

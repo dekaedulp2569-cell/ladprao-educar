@@ -239,12 +239,40 @@ Deno.serve(async (req) => {
   const requestData = request as CarRequestPayload
 
   if (request.status === 'pending' || request.status === 'tentative') {
-    const result = await pushFlex(
-      groupId(),
-      'มีรายการขอใช้รถราชการใหม่',
-      statusFlex(requestData, statusLabel),
+    const targets = new Map<string, string>()
+    const missingRecipients: string[] = []
+    const lineGroupId = groupId()
+    if (lineGroupId) targets.set(lineGroupId, 'กลุ่มฝ่ายการศึกษา')
+    else missingRecipients.push('กลุ่มฝ่ายการศึกษา (ไม่ได้ตั้งค่า LINE_GROUP_ID)')
+
+    if (request.requester_auth_user_id) {
+      const { data: requester, error: requesterError } = await admin
+        .from('user_profiles')
+        .select('line_user_id')
+        .eq('auth_user_id', request.requester_auth_user_id)
+        .maybeSingle()
+      if (requesterError) return json({ error: 'Unable to load requester LINE profile' }, 500)
+      if (requester?.line_user_id) targets.set(requester.line_user_id, 'ผู้ขอ')
+      else missingRecipients.push('ผู้ขอ (ไม่พบ LINE User ID)')
+    } else {
+      missingRecipients.push('ผู้ขอ (ไม่พบการเชื่อมบัญชี)')
+    }
+
+    const notifications = await Promise.all(
+      [...targets].map(async ([recipient, target]) => ({
+        target,
+        result: await pushFlex(
+          recipient,
+          target === 'ผู้ขอ' ? 'รับคำขอใช้รถเรียบร้อยแล้ว' : 'มีรายการขอใช้รถราชการใหม่',
+          statusFlex(requestData, statusLabel),
+        ),
+      })),
     )
-    return json({ target: 'group', result }, result.ok ? 200 : 502)
+    const ok =
+      missingRecipients.length === 0 &&
+      notifications.length > 0 &&
+      notifications.every(({ result }) => result.ok)
+    return json({ ok, notifications, missingRecipients })
   }
 
   const { data: requester, error: requesterError } = await admin

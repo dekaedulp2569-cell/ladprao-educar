@@ -19,12 +19,16 @@ export async function notifyLine(payload) {
     })
     if (error) {
       console.warn('LINE notify ยังไม่พร้อมใช้งาน:', error.message)
-      return { skipped: true }
+      return { ok: false, skipped: true, reason: error.message }
     }
     return data
   } catch (error) {
     console.warn('LINE notify ยังไม่พร้อมใช้งาน:', error)
-    return { skipped: true }
+    return {
+      ok: false,
+      skipped: true,
+      reason: error instanceof Error ? error.message : String(error),
+    }
   }
 }
 
