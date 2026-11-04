@@ -51,9 +51,33 @@ export function CarRequestForm({ onSubmitted }) {
   const [showPrintForm, setShowPrintForm] = useState(false)
   const [serverError, setServerError] = useState('')
   const [lineNotification, setLineNotification] = useState(null)
+  const [resendingNotification, setResendingNotification] = useState(false)
 
   const update = (field, value) => {
     setForm((current) => ({ ...current, [field]: value }))
+  }
+
+  const sendRequestNotification = async (request) => {
+    setResendingNotification(true)
+    const statusLabel =
+      request.status === 'tentative' ? 'รอ ผอ.เขต อนุมัติ' : 'รอตรวจสอบ'
+    const notification = await notifyLine({
+      type: 'status',
+      statusLabel,
+      request,
+      text: buildStatusMessage(request, statusLabel),
+    })
+    setLineNotification(
+      notification?.ok
+        ? { ok: true, message: 'ส่งข้อความยืนยันไปยัง LINE ของคุณและกลุ่มฝ่ายแล้ว' }
+        : {
+            ok: false,
+            message: `บันทึกคำขอแล้ว แต่ส่ง LINE ยืนยันไม่สำเร็จ: ${
+              notification?.reason || 'ตรวจการตั้งค่า LINE และการเชื่อมบัญชี'
+            }`,
+          },
+    )
+    setResendingNotification(false)
   }
 
   const special = useMemo(
@@ -157,23 +181,7 @@ export function CarRequestForm({ onSubmitted }) {
 
     // บันทึกคำขอก่อน แล้วรายงานผลการส่ง LINE แยกจากผลการบันทึก
     const saved = { ...payload, ...(data || {}) }
-    const statusLabel =
-      saved.status === 'tentative' ? 'รอ ผอ.เขต อนุมัติ' : 'รอตรวจสอบ'
-    const notification = await notifyLine({
-      type: 'status',
-      statusLabel,
-      request: saved,
-      text: buildStatusMessage(saved, statusLabel),
-    })
-    setLineNotification(
-      notification?.ok
-        ? { ok: true, message: 'ส่งข้อความยืนยันไปยัง LINE ของคุณและกลุ่มฝ่ายแล้ว' }
-        : {
-            ok: false,
-            message:
-              'บันทึกคำขอแล้ว แต่ส่ง LINE ยืนยันไม่สำเร็จ กรุณาตรวจการตั้งค่า LINE และแจ้งผู้ดูแลระบบ',
-          },
-    )
+    await sendRequestNotification(saved)
   }
 
   if (submitted) {
@@ -213,6 +221,16 @@ export function CarRequestForm({ onSubmitted }) {
               >
                 {lineNotification.message}
               </div>
+            ) : null}
+            {lineNotification && !lineNotification.ok ? (
+              <button
+                type="button"
+                onClick={() => void sendRequestNotification(submitted)}
+                disabled={resendingNotification}
+                className="rounded-lg border border-amber-300 bg-white px-3 py-2 text-sm font-semibold text-amber-800 hover:bg-amber-50 disabled:opacity-60"
+              >
+                {resendingNotification ? 'กำลังส่ง...' : 'ลองส่ง LINE อีกครั้ง'}
+              </button>
             ) : null}
             <div className="grid gap-3 text-sm sm:grid-cols-2">
               <div className="rounded-xl bg-slate-50 px-4 py-3">

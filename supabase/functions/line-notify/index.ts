@@ -228,7 +228,10 @@ Deno.serve(async (req) => {
       })),
     )
     const failed = missingRecipients.length > 0 || notifications.some(({ result }) => !result.ok)
-    return json({ notifications, missingRecipients }, failed ? 502 : 200)
+    return json(
+      { ok: !failed, notifications, missingRecipients },
+      failed ? 502 : 200,
+    )
   }
 
   if (!canManageRequest && request.requester_auth_user_id !== authData.user.id) {

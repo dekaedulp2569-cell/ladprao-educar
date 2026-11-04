@@ -12,14 +12,39 @@ import { formatDateTimeRange } from './helpers'
 
 export { formatDateTimeRange }
 
+async function getFunctionErrorReason(error) {
+  const response = error?.context
+  if (response instanceof Response) {
+    try {
+      const body = await response.clone().json()
+      const reasons = [
+        body.error,
+        ...(body.missingRecipients || []),
+        ...(body.notifications || [])
+          .filter(({ result }) => !result?.ok)
+          .map(({ target, result }) => {
+            const detail = result?.detail || result?.reason
+            const status = result?.status ? `HTTP ${result.status}` : ''
+            return [target, status, detail].filter(Boolean).join(': ')
+          }),
+      ].filter(Boolean)
+      if (reasons.length) return reasons.join(' · ')
+    } catch {
+      // The response body may not be JSON; use the function error message below.
+    }
+  }
+  return error?.message || 'ไม่ทราบสาเหตุ'
+}
+
 export async function notifyLine(payload) {
   try {
     const { data, error } = await supabase.functions.invoke('line-notify', {
       body: payload,
     })
     if (error) {
-      console.warn('LINE notify ยังไม่พร้อมใช้งาน:', error.message)
-      return { ok: false, skipped: true, reason: error.message }
+      const reason = await getFunctionErrorReason(error)
+      console.warn('LINE notify ยังไม่พร้อมใช้งาน:', reason)
+      return { ok: false, skipped: true, reason }
     }
     return data
   } catch (error) {
@@ -27,7 +52,7 @@ export async function notifyLine(payload) {
     return {
       ok: false,
       skipped: true,
-      reason: error instanceof Error ? error.message : String(error),
+      reason: await getFunctionErrorReason(error),
     }
   }
 }
