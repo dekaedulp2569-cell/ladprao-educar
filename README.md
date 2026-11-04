@@ -1,5 +1,7 @@
 # ระบบขอใช้รถและจัดสรรคิวรถ ฝ่ายการศึกษา สำนักงานเขตลาดพร้าว
 
+[![Deploy to GitHub Pages](https://github.com/dekaedulp2569-cell/ladprao-educar/actions/workflows/deploy.yml/badge.svg)](https://github.com/dekaedulp2569-cell/ladprao-educar/actions/workflows/deploy.yml)
+
 เว็บแอปพลิเคชันสำหรับยื่นคำขอใช้รถราชการ ตรวจสอบเงื่อนไขการอนุมัติอัตโนมัติ จัดสรรคิวรถ/พนักงานขับรถ และเผยแพร่ปฏิทินการใช้รถให้บุคลากรตรวจสอบได้โดยไม่ต้องเข้าสู่ระบบ
 
 - **เว็บไซต์ (หลัง deploy):** https://dekaedulp2569-cell.github.io/ladprao-educar/
