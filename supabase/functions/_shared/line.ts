@@ -39,11 +39,47 @@ export async function pushText(to: string | undefined | null, text: string) {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`,
+      Authorization: 'Bearer ' + token,
     },
     body: JSON.stringify({
       to,
       messages: [{ type: 'text', text: text.slice(0, 4900) }],
+    }),
+  })
+
+  if (!response.ok) {
+    return {
+      ok: false,
+      skipped: false,
+      status: response.status,
+      detail: await response.text(),
+    }
+  }
+  return { ok: true, skipped: false }
+}
+
+export async function pushFlex(
+  to: string | undefined | null,
+  altText: string,
+  contents: Record<string, unknown>,
+) {
+  const token = Deno.env.get('LINE_CHANNEL_ACCESS_TOKEN')
+  if (!token) {
+    return { ok: false, skipped: true, reason: 'ยังไม่ได้ตั้งค่า LINE_CHANNEL_ACCESS_TOKEN' }
+  }
+  if (!to) {
+    return { ok: false, skipped: true, reason: 'ไม่พบผู้รับข้อความ (to)' }
+  }
+
+  const response = await fetch(PUSH_ENDPOINT, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: 'Bearer ' + token,
+    },
+    body: JSON.stringify({
+      to,
+      messages: [{ type: 'flex', altText: altText.slice(0, 400), contents }],
     }),
   })
 
@@ -154,12 +190,14 @@ export type CarRequestPayload = {
   requester_name?: string
   requester_position?: string
   requester_department?: string
+  phone?: string
   destination?: string
   destination_province?: string
   start_datetime?: string
   end_datetime?: string
   passenger_count?: number
   status?: string
+  approval_type?: string
   external_car_info?: string | null
   external_driver_name?: string | null
 }

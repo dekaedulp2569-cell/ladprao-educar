@@ -18,11 +18,8 @@ function App() {
 
   const navItems = [
     { id: 'calendar', label: 'ปฏิทินรถ' },
-    ...(isApproved && session.role !== 'driver'
-      ? [
-          { id: 'request', label: 'ขอใช้รถ' },
-          { id: 'mine', label: 'คำขอของฉัน' },
-        ]
+    ...(isApproved
+      ? [{ id: 'request', label: 'ขอใช้รถ' }, { id: 'mine', label: 'คำขอของฉัน' }]
       : []),
     ...(canManage ? [{ id: 'admin', label: 'จัดการคำขอ' }] : []),
     ...(isApproved && session?.role === 'driver' ? [{ id: 'driver', label: 'งานของฉัน' }] : []),

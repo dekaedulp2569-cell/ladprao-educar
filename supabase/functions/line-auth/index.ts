@@ -32,6 +32,91 @@ async function hash(value: string) {
   return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('')
 }
 
+async function notifyAdminsOfNewMember(member: {
+  full_name: string
+  position: string
+  department: string
+}) {
+  const token = Deno.env.get('LINE_CHANNEL_ACCESS_TOKEN')
+  const recipients = Deno.env.get('LINE_ADMIN_USER_IDS')
+    ?.split(',')
+    .map((id) => id.trim())
+    .filter(Boolean)
+
+  if (!token || !recipients?.length) {
+    console.warn('New LINE member notification skipped: admin LINE notification is not configured')
+    return
+  }
+
+  const message = {
+    type: 'flex',
+    altText: 'มีผู้ใช้งานใหม่เข้าสู่ระบบ EduLP Car',
+    contents: {
+      type: 'bubble',
+      styles: { header: { backgroundColor: '#D97706' } },
+      header: {
+        type: 'box',
+        layout: 'vertical',
+        contents: [
+          { type: 'text', text: 'EduLP Car • แจ้งเตือนแอดมิน', color: '#FEF3C7', size: 'xs', weight: 'bold' },
+          { type: 'text', text: 'พบผู้ใช้งานใหม่เข้าสู่ระบบ', color: '#FFFFFF', size: 'md', weight: 'bold', wrap: true },
+        ],
+      },
+      body: {
+        type: 'box',
+        layout: 'vertical',
+        spacing: 'sm',
+        contents: [
+          { type: 'text', text: `ชื่อ-สกุล: ${member.full_name}`, size: 'sm', weight: 'bold', color: '#1F2937', wrap: true },
+          { type: 'text', text: `ตำแหน่ง: ${member.position}`, size: 'xs', color: '#4B5563', wrap: true },
+          { type: 'text', text: `สังกัด: ${member.department}`, size: 'xs', color: '#4B5563', wrap: true },
+          { type: 'text', text: 'สิทธิ์เริ่มต้น: Requester (ผู้ขอใช้รถ)', size: 'xs', color: '#D97706', weight: 'bold', wrap: true },
+        ],
+      },
+      footer: {
+        type: 'box',
+        layout: 'vertical',
+        contents: [
+          {
+            type: 'button',
+            action: {
+              type: 'uri',
+              label: 'เปิดระบบจัดการสมาชิก',
+              uri: 'https://dekaedulp2569-cell.github.io/ladprao-educar/',
+            },
+            style: 'primary',
+            color: '#D97706',
+          },
+        ],
+      },
+    },
+  }
+
+  const results = await Promise.all(
+    recipients.map(async (to) => {
+      const response = await fetch('https://api.line.me/v2/bot/message/push', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ to, messages: [message] }),
+      })
+      if (!response.ok) {
+        console.error('New LINE member notification failed', {
+          status: response.status,
+          body: await response.text(),
+        })
+      }
+      return response.ok
+    }),
+  )
+
+  if (results.some((ok) => !ok)) {
+    console.error('New LINE member notification failed for one or more admins')
+  }
+}
+
 Deno.serve(async (req) => {
   const origin = req.headers.get('origin')
   const corsHeaders = headersFor(origin)
@@ -106,6 +191,7 @@ Deno.serve(async (req) => {
 
   if (profileError) return json({ error: 'ค้นหาข้อมูลบัญชีไม่สำเร็จ' }, 500, corsHeaders)
 
+  let isNewProfile = false
   if (!profile) {
     const { data: createdProfile, error: createProfileError } = await admin
       .from('user_profiles')
@@ -115,7 +201,7 @@ Deno.serve(async (req) => {
         department: 'ฝ่ายการศึกษา สำนักงานเขตลาดพร้าว',
         role: 'requester',
         line_user_id: identity.sub,
-        approval_status: 'pending',
+        approval_status: 'approved',
       })
       .select('id, full_name, position, department, role, approval_status, auth_user_id')
       .single()
@@ -132,9 +218,21 @@ Deno.serve(async (req) => {
       profile = existingProfile
     } else {
       profile = createdProfile
+      isNewProfile = true
     }
   }
 
+  const needsApprovalUpgrade = profile.role === 'requester' && profile.approval_status === 'pending'
+  if (needsApprovalUpgrade) {
+    const { error: approvalError } = await admin
+      .from('user_profiles')
+      .update({ approval_status: 'approved' })
+      .eq('id', profile.id)
+    if (approvalError) return json({ error: 'เปิดใช้งานบัญชีผู้ขอใช้รถไม่สำเร็จ' }, 500, corsHeaders)
+    profile.approval_status = 'approved'
+  }
+
+  const needsAuthLink = !profile.auth_user_id
   let email = `line-${await hash(identity.sub)}@example.com`
   if (profile.auth_user_id) {
     const { data: authUser, error: authUserError } = await admin.auth.admin.getUserById(profile.auth_user_id)
@@ -186,6 +284,18 @@ Deno.serve(async (req) => {
   const hashedToken = link?.properties?.hashed_token
   if (linkError || !hashedToken) {
     return json({ error: 'สร้างเซสชันสำหรับเข้าสู่ระบบไม่สำเร็จ' }, 500, corsHeaders)
+  }
+
+  if (isNewProfile || needsAuthLink) {
+    try {
+      await notifyAdminsOfNewMember({
+        full_name: profile.full_name || identity.name || 'ผู้ใช้ LINE',
+        position: profile.position || 'ไม่ระบุตำแหน่ง',
+        department: profile.department || 'ไม่ระบุสังกัด',
+      })
+    } catch (error) {
+      console.error('New LINE member notification request failed', error)
+    }
   }
 
   return json(

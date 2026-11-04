@@ -43,7 +43,7 @@ export function PublicCalendar() {
       supabase
         .from('public_car_calendar')
         .select('id, status, destination, destination_province, start_datetime, end_datetime, assigned_car_id, external_car_info')
-        .in('status', ['approved', 'tentative'])
+        .eq('status', 'approved')
         .order('start_datetime', { ascending: true }),
       supabase.from('cars').select('*').order('created_at', { ascending: true }),
     ])
@@ -130,7 +130,7 @@ export function PublicCalendar() {
           ตรวจสอบวันและเวลาที่รถว่างได้ทันที ไม่ต้องเข้าสู่ระบบ
           เพื่อป้องกันการจองซ้ำซ้อนก่อนยื่นคำขอใช้รถ
         </p>
-        <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3">
           <div className="rounded-xl bg-white/10 px-4 py-3 backdrop-blur">
             <p className="text-xs text-brand-100">รถในระบบ</p>
             <p className="mt-1 text-xl font-bold">{cars.length} คัน</p>
@@ -143,12 +143,6 @@ export function PublicCalendar() {
             <p className="text-xs text-brand-100">อนุมัติแล้ว</p>
             <p className="mt-1 text-xl font-bold">
               {requests.filter((item) => item.status === 'approved').length} รายการ
-            </p>
-          </div>
-          <div className="rounded-xl bg-white/10 px-4 py-3 backdrop-blur">
-            <p className="text-xs text-brand-100">รอ ผอ.เขต</p>
-            <p className="mt-1 text-xl font-bold">
-              {requests.filter((item) => item.status === 'tentative').length} รายการ
             </p>
           </div>
         </div>

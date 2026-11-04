@@ -7,6 +7,7 @@ import {
   APPROVAL_TYPE,
   DOC_TYPE,
   formatDate,
+  includesWeekend,
   isOutOfBkk,
   isOutOfHours,
   toISO,
@@ -28,6 +29,7 @@ const emptyForm = {
   end_datetime: '',
   passenger_count: 1,
   purpose: '',
+  is_public_holiday: false,
 }
 
 export function CarRequestForm({ onSubmitted }) {
@@ -51,8 +53,10 @@ export function CarRequestForm({ onSubmitted }) {
   const special = useMemo(
     () =>
       isOutOfHours(form.start_datetime, form.end_datetime) ||
-      isOutOfBkk(form.destination_province),
-    [form.start_datetime, form.end_datetime, form.destination_province],
+      isOutOfBkk(form.destination_province) ||
+      includesWeekend(form.start_datetime, form.end_datetime) ||
+      form.is_public_holiday,
+    [form.start_datetime, form.end_datetime, form.destination_province, form.is_public_holiday],
   )
 
   const validation = () => {
@@ -98,6 +102,8 @@ export function CarRequestForm({ onSubmitted }) {
       purpose: form.purpose.trim() || null,
       is_out_of_hours: isOutOfHours(form.start_datetime, form.end_datetime),
       is_out_of_bkk: isOutOfBkk(form.destination_province),
+      is_weekend: includesWeekend(form.start_datetime, form.end_datetime),
+      is_public_holiday: Boolean(form.is_public_holiday),
       approval_type: special ? 'district_director' : 'head_of_dept',
       status: special ? 'tentative' : 'pending',
       director_approval_status: special ? 'pending' : 'not_required',
@@ -140,6 +146,12 @@ export function CarRequestForm({ onSubmitted }) {
   if (submitted) {
     const approval = APPROVAL_TYPE[submitted.approval_type]
     const tentative = submitted.status === 'tentative'
+    const specialReasons = [
+      submitted.is_out_of_bkk ? 'ออกนอกกรุงเทพมหานคร' : null,
+      submitted.is_out_of_hours ? 'นอกเวลาราชการ' : null,
+      submitted.is_weekend ? 'วันเสาร์-อาทิตย์' : null,
+      submitted.is_public_holiday ? 'วันหยุดนักขัตฤกษ์' : null,
+    ].filter(Boolean)
     return (
       <div className="mx-auto max-w-2xl">
         <Card className="overflow-hidden">
@@ -170,6 +182,12 @@ export function CarRequestForm({ onSubmitted }) {
                   {approval.document} → {approval.label}
                 </p>
                 <p className="text-xs text-slate-500">{approval.line}</p>
+              </div>
+              <div className="rounded-xl bg-slate-50 px-4 py-3 sm:col-span-2">
+                <p className="text-xs text-slate-500">เงื่อนไขการอนุมัติ</p>
+                <p className="mt-1 font-medium text-slate-800">
+                  {specialReasons.length ? specialReasons.join(' · ') : 'เดินทางในเวลาราชการและวันทำการ'}
+                </p>
               </div>
               <div className="rounded-xl bg-slate-50 px-4 py-3">
                 <p className="text-xs text-slate-500">วันเวลาเริ่มต้น</p>
@@ -278,6 +296,20 @@ export function CarRequestForm({ onSubmitted }) {
                 className={inputClass}
               />
             </Field>
+            <label className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50/60 p-3 text-sm text-slate-700 sm:col-span-2">
+              <input
+                type="checkbox"
+                checked={Boolean(form.is_public_holiday)}
+                onChange={(event) => update('is_public_holiday', event.target.checked)}
+                className="mt-0.5 h-4 w-4 rounded border-slate-300 text-amber-600 focus:ring-amber-500"
+              />
+              <span>
+                <span className="block font-medium">วันหยุดนักขัตฤกษ์</span>
+                <span className="mt-0.5 block text-xs text-slate-500">
+                  ระบบตรวจวันเสาร์-อาทิตย์ให้อัตโนมัติ หากวันเดินทางเป็นวันหยุดนักขัตฤกษ์ให้เลือกช่องนี้
+                </span>
+              </span>
+            </label>
           </div>
         </Card>
 
@@ -394,16 +426,18 @@ export function CarRequestForm({ onSubmitted }) {
             <div className="mt-3 space-y-2 text-sm text-amber-800">
               <p className="font-semibold">ต้องเสนอ ผอ.เขตลาดพร้าว ลงนามอนุมัติ</p>
               <p className="text-xs leading-relaxed">
-                เพราะอยู่นอกเวลาราชการ (ก่อน 08:00 หรือหลัง 16:00 น.) หรือออกนอกพื้นที่กรุงเทพมหานคร
-                โดย ผอ.เขตลาดพร้าว ปฏิบัติราชการแทน ปลัดกรุงเทพมหานคร
+                เนื่องจากอยู่นอกเวลาราชการ ออกนอกกรุงเทพมหานคร เป็นวันเสาร์-อาทิตย์
+                หรือเป็นวันหยุดนักขัตฤกษ์ ต้องเสนอ ผอ.เขตลาดพร้าวลงนามก่อน
+                จากนั้น Admin ตรวจเอกสารและอนุมัติในระบบ
               </p>
-              <p className="text-xs">สถานะเริ่มต้น: รอ ผอ.เขต อนุมัติ (Tentative)</p>
+              <p className="text-xs">ระหว่างรอลงนาม รายการจะไม่แสดงในปฏิทินสาธารณะ</p>
             </div>
           ) : (
             <div className="mt-3 space-y-2 text-sm text-brand-800">
               <p className="font-semibold">หัวหน้าฝ่ายการศึกษาพิจารณาอนุมัติได้</p>
               <p className="text-xs leading-relaxed">
-                อยู่ในเวลาราชการ 08:00-16:00 น. และอยู่ในพื้นที่กรุงเทพมหานคร
+                อยู่ในเวลาราชการ 08:00-16:00 น. อยู่ในพื้นที่กรุงเทพมหานคร
+                และไม่ตรงวันเสาร์-อาทิตย์หรือวันหยุดนักขัตฤกษ์
                 โดยหัวหน้าฝ่ายการศึกษา ปฏิบัติราชการแทน ผอ.เขตลาดพร้าว
               </p>
               <p className="text-xs">สถานะเริ่มต้น: รอตรวจสอบ (Pending) และล็อกคิวทันทีเมื่ออนุมัติ</p>

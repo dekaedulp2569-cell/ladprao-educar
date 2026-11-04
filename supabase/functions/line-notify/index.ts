@@ -1,18 +1,81 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import {
   STATUS_LABEL,
-  buildDriverMessage,
-  buildStatusMessage,
   corsHeaders,
+  formatThaiDateTimeRange,
   groupId,
   json,
-  pushText,
+  pushFlex,
   type CarRequestPayload,
 } from '../_shared/line.ts'
 
 type Payload = {
   type?: 'status' | 'driver_assigned'
   request?: { id?: string }
+}
+
+function statusFlex(request: CarRequestPayload, statusLabel: string, assignment?: {
+  carLabel?: string
+  driverName?: string
+  driverPhone?: string
+}) {
+  const rows: Record<string, unknown>[] = [
+    { type: 'text', text: `เลขที่เอกสาร: ${request.doc_number || '-'}`, size: 'xs', color: '#6B7280', wrap: true },
+    { type: 'text', text: `ผู้ขอ: ${request.requester_name || '-'}`, size: 'sm', weight: 'bold', wrap: true },
+    { type: 'text', text: `ปลายทาง: ${request.destination || '-'} (${request.destination_province || '-'})`, size: 'sm', wrap: true },
+    { type: 'text', text: `วันเวลา: ${formatThaiDateTimeRange(request.start_datetime, request.end_datetime)}`, size: 'sm', wrap: true },
+    { type: 'text', text: `ผู้อนุมัติ: ${request.approval_type === 'district_director' ? 'ผู้อำนวยการเขต' : 'หัวหน้าฝ่ายการศึกษา'}`, size: 'xs', color: '#4B5563', wrap: true },
+    { type: 'text', text: `สถานะ: ${statusLabel}`, size: 'sm', weight: 'bold', color: '#D97706', wrap: true },
+  ]
+
+  if (assignment) {
+    rows.push(
+      { type: 'separator', margin: 'sm' },
+      { type: 'text', text: `รถที่จัดสรร: ${assignment.carLabel || 'ไม่ระบุรถ'}`, size: 'sm', weight: 'bold', color: '#D97706', wrap: true },
+      { type: 'text', text: `คนขับ: ${assignment.driverName || 'ยังไม่ระบุคนขับ'}${assignment.driverPhone ? ` (${assignment.driverPhone})` : ''}`, size: 'sm', wrap: true },
+    )
+  }
+
+  return {
+    type: 'bubble',
+    styles: { header: { backgroundColor: request.status === 'approved' ? '#B45309' : '#F59E0B' } },
+    header: {
+      type: 'box',
+      layout: 'vertical',
+      contents: [
+        { type: 'text', text: 'EduLP Car • อัปเดตสถานะ', color: '#FEF3C7', size: 'xs', weight: 'bold' },
+        { type: 'text', text: statusLabel, color: '#FFFFFF', size: 'md', weight: 'bold', wrap: true },
+      ],
+    },
+    body: { type: 'box', layout: 'vertical', spacing: 'sm', contents: rows },
+  }
+}
+
+function driverFlex(request: CarRequestPayload, carLabel: string, driverName: string) {
+  return {
+    type: 'bubble',
+    styles: { header: { backgroundColor: '#D97706' } },
+    header: {
+      type: 'box',
+      layout: 'vertical',
+      contents: [
+        { type: 'text', text: 'EduLP Car • ใบสั่งงาน', color: '#FEF3C7', size: 'xs', weight: 'bold' },
+        { type: 'text', text: 'คุณมีคิววิ่งรถใหม่', color: '#FFFFFF', size: 'md', weight: 'bold', wrap: true },
+      ],
+    },
+    body: {
+      type: 'box',
+      layout: 'vertical',
+      spacing: 'sm',
+      contents: [
+        { type: 'text', text: `วันเวลา: ${formatThaiDateTimeRange(request.start_datetime, request.end_datetime)}`, size: 'sm', weight: 'bold', wrap: true },
+        { type: 'text', text: `รถ: ${carLabel}`, size: 'sm', wrap: true },
+        { type: 'text', text: `ปลายทาง: ${request.destination || '-'} (${request.destination_province || '-'})`, size: 'sm', wrap: true },
+        { type: 'text', text: `ผู้ติดต่อ: ${request.requester_name || '-'}${request.phone ? ` (${request.phone})` : ''}`, size: 'sm', color: '#2563EB', weight: 'bold', wrap: true },
+        { type: 'text', text: `พนักงานขับรถ: ${driverName}`, size: 'xs', color: '#4B5563', wrap: true },
+      ],
+    },
+  }
 }
 
 Deno.serve(async (req) => {
@@ -63,39 +126,95 @@ Deno.serve(async (req) => {
   if (requestError) return json({ error: 'Unable to load request' }, 500)
   if (!request) return json({ error: 'Request not found' }, 404)
 
-  const isStaff = profile.role === 'admin' || profile.role === 'head_of_dept'
   if (payload.type === 'driver_assigned') {
-    if (!isStaff) return json({ error: 'Staff access is required' }, 403)
-    if (!request.assigned_driver_id) return json({ error: 'No driver is assigned' }, 400)
+    if (profile.role !== 'admin') return json({ error: 'Admin access is required' }, 403)
+    if (request.status !== 'approved') {
+      return json({ error: 'Driver instructions can only be sent for approved requests' }, 409)
+    }
+    if (!request.assigned_driver_id && !request.external_driver_name) {
+      return json({ error: 'No driver is assigned' }, 400)
+    }
 
     const [{ data: driver, error: driverError }, { data: car, error: carError }] = await Promise.all([
-      admin
-        .from('drivers')
-        .select('full_name, dept, line_user_id')
-        .eq('id', request.assigned_driver_id)
-        .maybeSingle(),
+      request.assigned_driver_id
+        ? admin
+            .from('drivers')
+            .select('full_name, phone, dept, line_user_id')
+            .eq('id', request.assigned_driver_id)
+            .maybeSingle()
+        : Promise.resolve({ data: null, error: null }),
       request.assigned_car_id
         ? admin.from('cars').select('license_plate, car_type').eq('id', request.assigned_car_id).maybeSingle()
         : Promise.resolve({ data: null, error: null }),
     ])
     if (driverError || carError) return json({ error: 'Unable to load assignment details' }, 500)
-    if (!driver) return json({ error: 'Assigned driver not found' }, 404)
+    if (request.assigned_driver_id && !driver) return json({ error: 'Assigned driver not found' }, 404)
 
     const carLabel = request.external_car_info ||
       (car ? `${car.license_plate} (${car.car_type || 'รถ'})` : 'ไม่ระบุรถ')
-    const message = buildDriverMessage(request as CarRequestPayload, carLabel)
+    const requestData = request as CarRequestPayload
     const destination =
-      driver.dept === 'education' && driver.line_user_id ? driver.line_user_id : groupId()
-    const result = await pushText(destination, message)
+      driver?.dept === 'education' && driver?.line_user_id ? driver.line_user_id : groupId()
+    const result = await pushFlex(
+      destination,
+      'ใบสั่งงานพนักงานขับรถ',
+      driverFlex(requestData, carLabel, driver?.full_name || request.external_driver_name || 'พนักงานขับรถ'),
+    )
     return json({ target: destination === groupId() ? 'group' : 'driver_private', result }, result.ok ? 200 : 502)
   }
 
-  if (!isStaff && request.requester_auth_user_id !== authData.user.id) {
+  const canManageRequest =
+    profile.role === 'admin' ||
+    (profile.role === 'head_of_dept' && request.approval_type === 'head_of_dept')
+  if (!canManageRequest && request.requester_auth_user_id !== authData.user.id) {
     return json({ error: 'You cannot notify for this request' }, 403)
   }
 
   const statusLabel = STATUS_LABEL[String(request.status || '')] || 'อัปเดตสถานะ'
-  const message = buildStatusMessage(request as CarRequestPayload, statusLabel)
-  const result = await pushText(groupId(), message)
-  return json({ target: 'group', result }, result.ok ? 200 : 502)
+  const requestData = request as CarRequestPayload
+
+  if (request.status === 'pending' || request.status === 'tentative') {
+    const result = await pushFlex(
+      groupId(),
+      'มีรายการขอใช้รถราชการใหม่',
+      statusFlex(requestData, statusLabel),
+    )
+    return json({ target: 'group', result }, result.ok ? 200 : 502)
+  }
+
+  const { data: requester, error: requesterError } = await admin
+    .from('user_profiles')
+    .select('line_user_id')
+    .eq('auth_user_id', request.requester_auth_user_id)
+    .maybeSingle()
+  if (requesterError) return json({ error: 'Unable to load requester LINE profile' }, 500)
+  if (!requester?.line_user_id) {
+    return json({ error: 'Requester LINE account is not linked' }, 422)
+  }
+
+  let assignment: { carLabel?: string; driverName?: string; driverPhone?: string } | undefined
+  if (request.status === 'approved') {
+    const [{ data: car, error: carError }, { data: driver, error: driverError }] = await Promise.all([
+      request.assigned_car_id
+        ? admin.from('cars').select('license_plate, car_type').eq('id', request.assigned_car_id).maybeSingle()
+        : Promise.resolve({ data: null, error: null }),
+      request.assigned_driver_id
+        ? admin.from('drivers').select('full_name, phone').eq('id', request.assigned_driver_id).maybeSingle()
+        : Promise.resolve({ data: null, error: null }),
+    ])
+    if (carError || driverError) return json({ error: 'Unable to load assignment details' }, 500)
+    assignment = {
+      carLabel: request.external_car_info ||
+        (car ? `${car.license_plate} (${car.car_type || 'รถ'})` : undefined),
+      driverName: request.external_driver_name || driver?.full_name,
+      driverPhone: driver?.phone,
+    }
+  }
+
+  const result = await pushFlex(
+    requester.line_user_id,
+    request.status === 'approved' ? 'คำขอใช้รถได้รับการอนุมัติแล้ว' : 'อัปเดตสถานะคำขอใช้รถ',
+    statusFlex(requestData, statusLabel, assignment),
+  )
+  return json({ target: 'requester_private', result }, result.ok ? 200 : 502)
 })

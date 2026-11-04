@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
-import { buildDriverMessage, buildStatusMessage, notifyLine } from '../lib/line'
+import { buildStatusMessage, notifyLine } from '../lib/line'
 import {
   APPROVAL_TYPE,
   CAR_TYPE,
@@ -31,6 +31,8 @@ const STATUS_TABS = [
 
 export function AdminDashboard() {
   const { session } = useAuth()
+  const isAdmin = session?.role === 'admin'
+  const isHeadOfDept = session?.role === 'head_of_dept'
   const [tab, setTab] = useState('requests')
   const [requests, setRequests] = useState([])
   const [cars, setCars] = useState([])
@@ -42,6 +44,7 @@ export function AdminDashboard() {
   const [selected, setSelected] = useState(null)
   const [printRequest, setPrintRequest] = useState(null)
   const [busy, setBusy] = useState(false)
+  const [summaryBusy, setSummaryBusy] = useState(false)
 
   const load = async () => {
     setLoading(true)
@@ -94,20 +97,39 @@ export function AdminDashboard() {
 
   const updateRequest = async (id, patch) => {
     setBusy(true)
-    const { error: updateError } = await supabase
+    const { data: updatedRequest, error: updateError } = await supabase
       .from('car_requests')
       .update({ ...patch, updated_at: new Date().toISOString() })
       .eq('id', id)
+      .select('id')
+      .maybeSingle()
     setBusy(false)
     if (updateError) {
       setError(`อัปเดตไม่สำเร็จ: ${updateError.message}`)
+      return false
+    }
+    if (!updatedRequest) {
+      setError('อัปเดตไม่สำเร็จ: บัญชีนี้ไม่มีสิทธิ์ดำเนินการกับคำขอนี้')
       return false
     }
     await load()
     return true
   }
 
+  const notifyAssignedDriver = (request) => {
+    if (!request.assigned_driver_id && !request.external_driver_name) return
+    void notifyLine({ type: 'driver_assigned', request })
+  }
+
   const approve = async (request) => {
+    const canApprove =
+      isAdmin ||
+      (isHeadOfDept && request.approval_type === 'head_of_dept' && request.status === 'pending')
+    if (!canApprove) {
+      setError('บัญชีนี้ไม่มีสิทธิ์อนุมัติคำขอนี้')
+      return
+    }
+
     const conflict = request.assigned_car_id
       ? requests.find(
           (item) =>
@@ -142,6 +164,7 @@ export function AdminDashboard() {
           statusLabel: 'อนุมัติแล้ว (ล็อกคิว)',
           text: buildStatusMessage(approved, 'อนุมัติแล้ว (ล็อกคิว)'),
         })
+        notifyAssignedDriver(request)
       }
       return
     }
@@ -158,11 +181,20 @@ export function AdminDashboard() {
           statusLabel: 'อนุมัติแล้ว (ล็อกคิว)',
           text: buildStatusMessage(approved, 'อนุมัติแล้ว (ล็อกคิว)'),
         })
+        notifyAssignedDriver(request)
       }
     }
   }
 
   const reject = async (request) => {
+    const canReject =
+      isAdmin ||
+      (isHeadOfDept && request.approval_type === 'head_of_dept' && request.status === 'pending')
+    if (!canReject) {
+      setError('บัญชีนี้ไม่มีสิทธิ์ไม่อนุมัติคำขอนี้')
+      return
+    }
+
     const ok = window.confirm('ยืนยันการไม่อนุมัติคำขอนี้หรือไม่')
     if (!ok) return
     const saved = await updateRequest(request.id, {
@@ -181,6 +213,11 @@ export function AdminDashboard() {
   }
 
   const saveAllocation = async (request, allocation) => {
+    if (!isAdmin) {
+      setError('เฉพาะผู้ดูแลระบบเท่านั้นที่จัดสรรรถและพนักงานขับรถได้')
+      return false
+    }
+
     const internalCar = allocation.carMode === 'internal' ? allocation.carId || null : null
     const internalDriver = allocation.driverMode === 'internal' ? allocation.driverId || null : null
 
@@ -209,15 +246,6 @@ export function AdminDashboard() {
     })
 
     if (saved) {
-      const car = cars.find((item) => item.id === internalCar)
-      const carLabel =
-        allocation.carMode === 'internal' && car
-          ? `${car.license_plate} (${CAR_TYPE[car.car_type] || 'รถ'})`
-          : allocation.externalCar.trim() || 'รถยืมฝ่ายอื่น'
-      const driver =
-        allocation.driverMode === 'internal'
-          ? drivers.find((item) => item.id === internalDriver) || null
-          : { full_name: allocation.externalDriver.trim(), dept: 'external', line_user_id: null }
       const updated = {
         ...request,
         assigned_car_id: internalCar,
@@ -227,16 +255,33 @@ export function AdminDashboard() {
           allocation.driverMode === 'external' ? allocation.externalDriver.trim() : null,
       }
 
-      void notifyLine({
-        type: 'driver_assigned',
-        request: updated,
-        driver,
-        carLabel,
-        text: buildDriverMessage(updated, carLabel),
-      })
+      if (request.status === 'approved') notifyAssignedDriver(updated)
     }
 
     return saved
+  }
+
+  const sendDailySummary = async () => {
+    setSummaryBusy(true)
+    setError('')
+    try {
+      const { data, error: summaryError } = await supabase.functions.invoke('daily-summary', {
+        body: {},
+      })
+      if (summaryError) {
+        setError(`ส่งสรุปตารางรถไม่สำเร็จ: ${summaryError.message}`)
+      } else {
+        window.alert(`ส่งสรุปตารางรถของวันพรุ่งนี้แล้ว (${data?.jobs ?? 0} รายการ)`)
+      }
+    } catch (summaryError) {
+      setError(
+        `ส่งสรุปตารางรถไม่สำเร็จ: ${
+          summaryError instanceof Error ? summaryError.message : 'เกิดข้อผิดพลาดที่ไม่ทราบสาเหตุ'
+        }`,
+      )
+    } finally {
+      setSummaryBusy(false)
+    }
   }
 
   return (
@@ -249,13 +294,25 @@ export function AdminDashboard() {
             ผู้ใช้งาน: {session?.name} · {session?.position}
           </p>
         </div>
-        <button
-          type="button"
-          onClick={load}
-          className="rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-slate-600 transition hover:bg-slate-50"
-        >
-          ↻ รีเฟรชข้อมูล
-        </button>
+        <div className="flex flex-wrap gap-2">
+          {isAdmin ? (
+            <button
+              type="button"
+              onClick={sendDailySummary}
+              disabled={summaryBusy}
+              className="rounded-xl border border-brand-300 bg-brand-50 px-4 py-2.5 text-sm font-medium text-brand-800 transition hover:bg-brand-100 disabled:opacity-60"
+            >
+              {summaryBusy ? 'กำลังส่งสรุป...' : 'ส่งสรุปงานวันพรุ่งนี้'}
+            </button>
+          ) : null}
+          <button
+            type="button"
+            onClick={load}
+            className="rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-slate-600 transition hover:bg-slate-50"
+          >
+            ↻ รีเฟรชข้อมูล
+          </button>
+        </div>
       </div>
 
       {error ? <Alert tone="danger">{error}</Alert> : null}
@@ -270,9 +327,13 @@ export function AdminDashboard() {
       <div className="flex flex-wrap gap-2 rounded-2xl border border-slate-200 bg-white p-1.5">
         {[
           { value: 'requests', label: 'คำขอใช้รถ' },
-          { value: 'resources', label: 'รถและคนขับ' },
-          { value: 'members', label: 'จัดการสมาชิก' },
-          { value: 'reports', label: 'รายงานและจัดการข้อมูล' },
+          ...(isAdmin
+            ? [
+                { value: 'resources', label: 'รถและคนขับ' },
+                { value: 'members', label: 'จัดการสมาชิก' },
+                { value: 'reports', label: 'รายงานและจัดการข้อมูล' },
+              ]
+            : []),
         ].map((item) => (
           <button
             key={item.value}
@@ -338,6 +399,12 @@ export function AdminDashboard() {
                     request={request}
                     cars={cars}
                     drivers={drivers}
+                    canManageRequest={
+                      isAdmin ||
+                      (isHeadOfDept &&
+                        request.approval_type === 'head_of_dept' &&
+                        request.status === 'pending')
+                    }
                     onOpen={() => setSelected(request)}
                     onPrint={() => openForm3PrintWindow(request, car, driver)}
                   />
@@ -374,6 +441,13 @@ export function AdminDashboard() {
         onApprove={approve}
         onReject={reject}
         onSaveAllocation={saveAllocation}
+        canManageAllocation={isAdmin}
+        canReviewRequest={
+          isAdmin ||
+          (isHeadOfDept &&
+            selected?.approval_type === 'head_of_dept' &&
+            selected?.status === 'pending')
+        }
         onPrint={(req) => {
           const car = cars.find((c) => c.id === req.assigned_car_id)
           const driver = drivers.find((d) => d.id === req.assigned_driver_id)
@@ -407,7 +481,7 @@ function StatCard({ label, value, tone }) {
   )
 }
 
-function RequestCard({ request, cars, drivers, onOpen, onPrint }) {
+function RequestCard({ request, cars, drivers, canManageRequest, onOpen, onPrint }) {
   const car = cars.find((item) => item.id === request.assigned_car_id)
   const driver = drivers.find((item) => item.id === request.assigned_driver_id)
   const carLabel = car
@@ -445,6 +519,12 @@ function RequestCard({ request, cars, drivers, onOpen, onPrint }) {
         {request.is_out_of_bkk ? (
           <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] text-amber-700">นอก กทม.</span>
         ) : null}
+        {request.is_weekend ? (
+          <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] text-amber-700">วันเสาร์-อาทิตย์</span>
+        ) : null}
+        {request.is_public_holiday ? (
+          <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] text-amber-700">วันหยุดนักขัตฤกษ์</span>
+        ) : null}
         <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] text-slate-600">
           {APPROVAL_TYPE[request.approval_type]?.label || 'รอตรวจสอบผู้อนุมัติ'}
         </span>
@@ -461,7 +541,7 @@ function RequestCard({ request, cars, drivers, onOpen, onPrint }) {
             onClick={onOpen}
             className="rounded-lg bg-brand-700 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-brand-800"
           >
-            จัดการคำขอ
+            {canManageRequest ? 'จัดการคำขอ' : 'ดูรายละเอียด'}
           </button>
         </div>
       </div>
@@ -469,7 +549,19 @@ function RequestCard({ request, cars, drivers, onOpen, onPrint }) {
   )
 }
 
-function RequestDetail({ request, cars, drivers, busy, onClose, onApprove, onReject, onSaveAllocation, onPrint }) {
+function RequestDetail({
+  request,
+  cars,
+  drivers,
+  busy,
+  onClose,
+  onApprove,
+  onReject,
+  onSaveAllocation,
+  canManageAllocation,
+  canReviewRequest,
+  onPrint,
+}) {
   const [allocation, setAllocation] = useState({
     carMode: 'internal',
     carId: '',
@@ -530,6 +622,16 @@ function RequestDetail({ request, cars, drivers, busy, onClose, onApprove, onRej
           <Info label="โทรศัพท์" value={request.phone || '-'} />
           <Info label="วันเวลาเริ่มต้น" value={formatDate(request.start_datetime, true)} />
           <Info label="วันเวลาสิ้นสุด" value={formatDate(request.end_datetime, true)} />
+          <Info
+            label="เงื่อนไขการเดินทาง"
+            value={[
+              request.is_out_of_bkk ? 'นอก กทม.' : null,
+              request.is_out_of_hours ? 'นอกเวลา' : null,
+              request.is_weekend ? 'เสาร์-อาทิตย์' : null,
+              request.is_public_holiday ? 'วันหยุดนักขัตฤกษ์' : null,
+            ].filter(Boolean).join(' · ') || 'วันทำการ / ในเวลาราชการ'}
+            className="sm:col-span-2"
+          />
           <Info label="จำนวนผู้โดยสาร" value={`${request.passenger_count} คน`} />
           <Info label="ประเภทเอกสาร" value={DOC_TYPE[request.doc_type] || '-'} />
           <Info label="วัตถุประสงค์" value={request.purpose || '-'} className="sm:col-span-2" />
@@ -548,7 +650,7 @@ function RequestDetail({ request, cars, drivers, busy, onClose, onApprove, onRej
           ) : null}
         </div>
 
-        <div>
+        {canManageAllocation ? <div>
           <h4 className="mb-2 text-sm font-semibold text-slate-800">การจัดสรรทรัพยากร</h4>
           <div className="space-y-3 rounded-xl border border-slate-200 p-4">
             <div>
@@ -646,7 +748,7 @@ function RequestDetail({ request, cars, drivers, busy, onClose, onApprove, onRej
               {busy ? 'กำลังบันทึก...' : 'บันทึกการจัดสรร'}
             </button>
           </div>
-        </div>
+        </div> : null}
 
         {(car || driver || request.external_car_info || request.external_driver_name) ? (
           <div className="rounded-xl bg-slate-50 px-4 py-3 text-sm text-slate-600">
@@ -659,7 +761,8 @@ function RequestDetail({ request, cars, drivers, busy, onClose, onApprove, onRej
           </div>
         ) : null}
 
-        {(request.status === 'pending' || request.status === 'tentative') ? (
+        {canReviewRequest &&
+        (request.status === 'pending' || request.status === 'tentative') ? (
           <div className="flex flex-col gap-2 border-t border-slate-200 pt-4 sm:flex-row">
             <button
               type="button"

@@ -100,6 +100,22 @@ export function isOutOfBkk(province) {
   return province !== 'กรุงเทพมหานคร'
 }
 
+/** ตรวจว่าช่วงเดินทางมีวันเสาร์หรืออาทิตย์อย่างน้อยหนึ่งวันหรือไม่ */
+export function includesWeekend(startLocal, endLocal) {
+  if (!startLocal || !endLocal) return false
+  const start = new Date(startLocal)
+  const end = new Date(endLocal)
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end < start) return false
+
+  const cursor = new Date(start.getFullYear(), start.getMonth(), start.getDate())
+  const last = new Date(end.getFullYear(), end.getMonth(), end.getDate())
+  while (cursor <= last) {
+    if (cursor.getDay() === 0 || cursor.getDay() === 6) return true
+    cursor.setDate(cursor.getDate() + 1)
+  }
+  return false
+}
+
 export const THAI_MONTHS_SHORT = [
   'ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.',
   'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.',
