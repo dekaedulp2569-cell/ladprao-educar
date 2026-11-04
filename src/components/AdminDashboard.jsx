@@ -14,6 +14,7 @@ import {
   formatDate,
   formatDateTimeRange,
   overlaps,
+  toISO,
 } from '../lib/helpers'
 import { PROVINCES } from '../lib/provinces'
 import { Alert, Card, EmptyState, Modal, SectionTitle, Spinner, StatusBadge } from './ui'
@@ -40,10 +41,13 @@ export function AdminDashboard() {
   const [drivers, setDrivers] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [notice, setNotice] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
   const [search, setSearch] = useState('')
   const [selected, setSelected] = useState(null)
   const [printRequest, setPrintRequest] = useState(null)
+  const [editingRequest, setEditingRequest] = useState(null)
+  const [lineNotifyBusyId, setLineNotifyBusyId] = useState(null)
   const [busy, setBusy] = useState(false)
   const [summaryBusy, setSummaryBusy] = useState(false)
 
@@ -120,6 +124,61 @@ export function AdminDashboard() {
   const notifyAssignedDriver = (request) => {
     if (!request.assigned_driver_id && !request.external_driver_name) return
     void notifyLine({ type: 'driver_assigned', request })
+  }
+
+  const notifyRequestParties = async (request, successMessage = 'ส่งข้อความ LINE ให้ผู้เกี่ยวข้องแล้ว') => {
+    setError('')
+    setNotice('')
+    setLineNotifyBusyId(request.id)
+    const result = await notifyLine({ type: 'request_reminder', request: { id: request.id } })
+    setLineNotifyBusyId(null)
+
+    if (!result?.ok) {
+      setError(
+        `ส่ง LINE ไม่ครบ: ${
+          result?.reason || 'ตรวจสอบ LINE User ID ของผู้เกี่ยวข้องและ LINE_GROUP_ID'
+        }`,
+      )
+      return false
+    }
+
+    setNotice(successMessage)
+    return true
+  }
+
+  const saveEditedRequest = async (request, values) => {
+    if (!isAdmin || request.status === 'cancelled') {
+      setError('เฉพาะ Admin สามารถแก้ไขคำขอที่ยังไม่ถูกยกเลิกได้')
+      return
+    }
+
+    const patch = {
+      request_date: values.request_date,
+      doc_type: values.doc_type,
+      doc_number: values.doc_number.trim(),
+      requester_name: values.requester_name.trim(),
+      requester_position: values.requester_position.trim(),
+      requester_department: values.requester_department.trim(),
+      phone: values.phone.trim() || null,
+      destination: values.destination.trim(),
+      destination_province: values.destination_province,
+      start_datetime: toISO(values.start_datetime),
+      end_datetime: toISO(values.end_datetime),
+      passenger_count: Number(values.passenger_count),
+      purpose: values.purpose.trim() || null,
+      is_public_holiday: Boolean(values.is_public_holiday),
+    }
+    const saved = await updateRequest(request.id, patch)
+    if (!saved) return
+
+    setEditingRequest(null)
+    const notified = await notifyRequestParties(
+      request,
+      'บันทึกการแก้ไขแล้ว และส่งข้อมูลล่าสุดให้ผู้ขอ คนขับ และกลุ่มฝ่ายทาง LINE แล้ว',
+    )
+    if (!notified) {
+      setError((message) => `บันทึกการแก้ไขแล้ว แต่ ${message}`)
+    }
   }
 
   const approve = async (request) => {
@@ -340,6 +399,7 @@ export function AdminDashboard() {
       </div>
 
       {error ? <Alert tone="danger">{error}</Alert> : null}
+      {notice ? <Alert tone="success">{notice}</Alert> : null}
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
         <StatCard label="รอตรวจสอบ" value={counts.pending} tone="brand" />
@@ -414,27 +474,99 @@ export function AdminDashboard() {
           {filtered.length === 0 ? (
             <EmptyState title="ไม่พบรายการคำขอ" description="ลองเปลี่ยนตัวกรองสถานะหรือคำค้นหา" />
           ) : (
-            <div className="grid gap-4 lg:grid-cols-2">
-              {filtered.map((request) => {
-                const car = cars.find((c) => c.id === request.assigned_car_id)
-                const driver = drivers.find((d) => d.id === request.assigned_driver_id)
-                return (
-                  <RequestCard
-                    key={request.id}
-                    request={request}
-                    cars={cars}
-                    drivers={drivers}
-                    canManageRequest={
-                      isAdmin ||
-                      (isHeadOfDept &&
-                        request.approval_type === 'head_of_dept' &&
-                        request.status === 'pending')
-                    }
-                    onOpen={() => setSelected(request)}
-                    onPrint={() => openForm3PrintWindow(request, car, driver)}
-                  />
-                )
-              })}
+            <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white">
+              <table className="min-w-[1100px] w-full divide-y divide-slate-200 text-left text-sm">
+                <thead className="bg-slate-50 text-xs font-semibold text-slate-600">
+                  <tr>
+                    <th className="px-4 py-3">เลขที่ / วันที่ยื่น</th>
+                    <th className="px-4 py-3">ผู้ขอ / สังกัด</th>
+                    <th className="px-4 py-3">ปลายทาง / วันเวลา</th>
+                    <th className="px-4 py-3">รถ / คนขับ</th>
+                    <th className="px-4 py-3">สถานะ</th>
+                    <th className="px-4 py-3">จัดการ</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {filtered.map((request) => {
+                    const car = cars.find((item) => item.id === request.assigned_car_id)
+                    const driver = drivers.find((item) => item.id === request.assigned_driver_id)
+                    return (
+                      <tr key={request.id} className="align-top hover:bg-slate-50/70">
+                        <td className="px-4 py-3">
+                          <p className="font-semibold text-slate-800">{request.doc_number || '-'}</p>
+                          <p className="mt-1 text-xs text-slate-500">
+                            ยื่น {formatDate(request.request_date || request.created_at)}
+                          </p>
+                        </td>
+                        <td className="max-w-56 px-4 py-3">
+                          <p className="font-medium text-slate-800">{request.requester_name || '-'}</p>
+                          <p className="mt-1 text-xs text-slate-500">{request.requester_department || '-'}</p>
+                        </td>
+                        <td className="max-w-64 px-4 py-3">
+                          <p className="font-medium text-slate-800">
+                            {request.destination || '-'} · {request.destination_province || '-'}
+                          </p>
+                          <p className="mt-1 text-xs text-slate-500">
+                            {formatDateTimeRange(request.start_datetime, request.end_datetime)}
+                          </p>
+                        </td>
+                        <td className="px-4 py-3 text-xs text-slate-600">
+                          <p>{car ? `${car.license_plate} (${CAR_TYPE[car.car_type] || 'รถ'})` : request.external_car_info || 'ยังไม่จัดสรรรถ'}</p>
+                          <p className="mt-1">{driver?.full_name || request.external_driver_name || 'ยังไม่จัดสรรคนขับ'}</p>
+                        </td>
+                        <td className="px-4 py-3"><StatusBadge status={request.status} /></td>
+                        <td className="px-4 py-3">
+                          <div className="flex min-w-56 flex-wrap gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => setSelected(request)}
+                              className="rounded-lg bg-brand-700 px-2.5 py-1.5 text-xs font-semibold text-white hover:bg-brand-800"
+                            >
+                              ดู / จัดการ
+                            </button>
+                            {isAdmin && request.status !== 'cancelled' ? (
+                              <button
+                                type="button"
+                                onClick={() => setEditingRequest(request)}
+                                className="rounded-lg border border-slate-300 px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100"
+                              >
+                                แก้ไข
+                              </button>
+                            ) : null}
+                            <button
+                              type="button"
+                              onClick={() => openForm3PrintWindow(request, car, driver)}
+                              className="rounded-lg border border-brand-200 px-2.5 py-1.5 text-xs font-semibold text-brand-800 hover:bg-brand-50"
+                            >
+                              พิมพ์แบบ ๓
+                            </button>
+                            {isAdmin ? (
+                              <button
+                                type="button"
+                                onClick={() => void notifyRequestParties(request)}
+                                disabled={lineNotifyBusyId === request.id}
+                                className="rounded-lg border border-emerald-200 px-2.5 py-1.5 text-xs font-semibold text-emerald-800 hover:bg-emerald-50 disabled:opacity-60"
+                              >
+                                {lineNotifyBusyId === request.id ? 'กำลังส่ง...' : 'แจ้ง LINE'}
+                              </button>
+                            ) : null}
+                            {isAdmin && request.status === 'approved' ? (
+                              <button
+                                type="button"
+                                onClick={() => void cancelApprovedRequest(request)}
+                                disabled={busy}
+                                className="rounded-lg border border-rose-200 px-2.5 py-1.5 text-xs font-semibold text-rose-700 hover:bg-rose-50 disabled:opacity-60"
+                              >
+                                ยกเลิก
+                              </button>
+                            ) : null}
+                          </div>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
             </div>
           )}
         </>
@@ -482,6 +614,16 @@ export function AdminDashboard() {
         }}
       />
 
+      {editingRequest ? (
+        <RequestEditModal
+          key={editingRequest.id}
+          request={editingRequest}
+          busy={busy}
+          onClose={() => setEditingRequest(null)}
+          onSave={saveEditedRequest}
+        />
+      ) : null}
+
       <OfficialCarFormModal
         open={Boolean(printRequest)}
         onClose={() => setPrintRequest(null)}
@@ -509,71 +651,148 @@ function StatCard({ label, value, tone }) {
   )
 }
 
-function RequestCard({ request, cars, drivers, canManageRequest, onOpen, onPrint }) {
-  const car = cars.find((item) => item.id === request.assigned_car_id)
-  const driver = drivers.find((item) => item.id === request.assigned_driver_id)
-  const carLabel = car
-    ? `${car.license_plate} (${CAR_TYPE[car.car_type] || 'รถ'})`
-    : request.external_car_info || 'ยังไม่จัดสรรรถ'
-  const driverLabel = driver
-    ? driver.full_name
-    : request.external_driver_name || 'ยังไม่จัดสรรคนขับ'
+function dateTimeLocalValue(value) {
+  if (!value) return ''
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return ''
+  return new Date(date.getTime() - date.getTimezoneOffset() * 60_000)
+    .toISOString()
+    .slice(0, 16)
+}
+
+function RequestEditModal({ request, busy, onClose, onSave }) {
+  const [values, setValues] = useState(() => ({
+    request_date: request.request_date || '',
+    doc_type: request.doc_type || 'school_letter',
+    doc_number: request.doc_number || '',
+    requester_name: request.requester_name || '',
+    requester_position: request.requester_position || '',
+    requester_department: request.requester_department || '',
+    phone: request.phone || '',
+    destination: request.destination || '',
+    destination_province: request.destination_province || 'กรุงเทพมหานคร',
+    start_datetime: dateTimeLocalValue(request.start_datetime),
+    end_datetime: dateTimeLocalValue(request.end_datetime),
+    passenger_count: request.passenger_count || 1,
+    purpose: request.purpose || '',
+    is_public_holiday: Boolean(request.is_public_holiday),
+  }))
+  const [validationError, setValidationError] = useState('')
+
+  const update = (field, value) => {
+    setValues((current) => ({ ...current, [field]: value }))
+  }
+  const save = async (event) => {
+    event.preventDefault()
+    setValidationError('')
+    if (new Date(values.end_datetime) <= new Date(values.start_datetime)) {
+      setValidationError('เวลาสิ้นสุดต้องอยู่หลังเวลาเริ่มต้น')
+      return
+    }
+    if (Number(values.passenger_count) < 1) {
+      setValidationError('จำนวนผู้โดยสารต้องอย่างน้อย 1 คน')
+      return
+    }
+    await onSave(request, values)
+  }
 
   return (
-    <Card className="p-4 transition hover:border-brand-300 hover:shadow-md">
-      <div className="flex flex-wrap items-start justify-between gap-2">
-        <div className="min-w-0">
-          <p className="text-xs text-slate-400">{request.doc_number} · {DOC_TYPE[request.doc_type] || 'เอกสาร'}</p>
-          <p className="mt-1 truncate text-base font-semibold text-slate-800">
-            {request.destination}
-          </p>
-          <p className="text-xs text-slate-500">{request.destination_province}</p>
-        </div>
-        <StatusBadge status={request.status} />
-      </div>
+    <Modal open={Boolean(request)} onClose={onClose} title="แก้ไขคำขอใช้รถ" size="lg">
+      <form onSubmit={save} className="space-y-4">
+        {request.status === 'approved' ? (
+          <Alert tone="warning">
+            หากแก้วันเวลา จังหวัดปลายทาง หรือวันหยุด ระบบจะคำนวณเส้นทางอนุมัติใหม่
+            เปลี่ยนกลับเป็นรออนุมัติ และล้างรถ/คนขับที่จัดสรรไว้
+          </Alert>
+        ) : null}
+        {validationError ? <Alert tone="danger">{validationError}</Alert> : null}
 
-      <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-slate-600">
-        <p>👤 {request.requester_name}</p>
-        <p>🏢 {request.requester_department}</p>
-        <p className="col-span-2">📅 {formatDateTimeRange(request.start_datetime, request.end_datetime)}</p>
-        <p>🚐 {carLabel}</p>
-        <p>🧑‍✈️ {driverLabel}</p>
-      </div>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <label className="space-y-1 text-xs font-medium text-slate-600">
+            ประเภทเอกสาร
+            <select
+              value={values.doc_type}
+              onChange={(event) => update('doc_type', event.target.value)}
+              className={selectClass}
+            >
+              <option value="school_letter">{DOC_TYPE.school_letter}</option>
+              <option value="dept_form">{DOC_TYPE.dept_form}</option>
+            </select>
+          </label>
+          <label className="space-y-1 text-xs font-medium text-slate-600">
+            เลขที่เอกสาร
+            <input required value={values.doc_number} onChange={(event) => update('doc_number', event.target.value)} className={selectClass} />
+          </label>
+          <label className="space-y-1 text-xs font-medium text-slate-600">
+            วันที่ยื่นคำขอ
+            <input required type="date" value={values.request_date} onChange={(event) => update('request_date', event.target.value)} className={selectClass} />
+          </label>
+          <label className="space-y-1 text-xs font-medium text-slate-600">
+            ชื่อผู้ขอ
+            <input required value={values.requester_name} onChange={(event) => update('requester_name', event.target.value)} className={selectClass} />
+          </label>
+          <label className="space-y-1 text-xs font-medium text-slate-600">
+            ตำแหน่ง
+            <input required value={values.requester_position} onChange={(event) => update('requester_position', event.target.value)} className={selectClass} />
+          </label>
+          <label className="space-y-1 text-xs font-medium text-slate-600">
+            สังกัด
+            <input required value={values.requester_department} onChange={(event) => update('requester_department', event.target.value)} className={selectClass} />
+          </label>
+          <label className="space-y-1 text-xs font-medium text-slate-600">
+            โทรศัพท์
+            <input value={values.phone} onChange={(event) => update('phone', event.target.value)} className={selectClass} />
+          </label>
+          <label className="space-y-1 text-xs font-medium text-slate-600">
+            สถานที่ปลายทาง
+            <input required value={values.destination} onChange={(event) => update('destination', event.target.value)} className={selectClass} />
+          </label>
+          <label className="space-y-1 text-xs font-medium text-slate-600">
+            จังหวัด
+            <select
+              value={values.destination_province}
+              onChange={(event) => update('destination_province', event.target.value)}
+              className={selectClass}
+            >
+              {PROVINCES.map((province) => <option key={province} value={province}>{province}</option>)}
+            </select>
+          </label>
+          <label className="space-y-1 text-xs font-medium text-slate-600">
+            วันเวลาเริ่มต้น
+            <input required type="datetime-local" value={values.start_datetime} onChange={(event) => update('start_datetime', event.target.value)} className={selectClass} />
+          </label>
+          <label className="space-y-1 text-xs font-medium text-slate-600">
+            วันเวลาสิ้นสุด
+            <input required type="datetime-local" value={values.end_datetime} onChange={(event) => update('end_datetime', event.target.value)} className={selectClass} />
+          </label>
+          <label className="space-y-1 text-xs font-medium text-slate-600">
+            จำนวนผู้โดยสาร
+            <input required min="1" type="number" value={values.passenger_count} onChange={(event) => update('passenger_count', event.target.value)} className={selectClass} />
+          </label>
+          <label className="flex items-center gap-2 self-end rounded-xl border border-slate-200 px-3 py-3 text-sm text-slate-700">
+            <input
+              type="checkbox"
+              checked={values.is_public_holiday}
+              onChange={(event) => update('is_public_holiday', event.target.checked)}
+            />
+            วันหยุดนักขัตฤกษ์
+          </label>
+          <label className="space-y-1 text-xs font-medium text-slate-600 sm:col-span-2">
+            วัตถุประสงค์
+            <textarea value={values.purpose} onChange={(event) => update('purpose', event.target.value)} rows="3" className={selectClass} />
+          </label>
+        </div>
 
-      <div className="mt-3 flex flex-wrap items-center gap-1.5">
-        {request.is_out_of_hours ? (
-          <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] text-amber-700">นอกเวลา</span>
-        ) : null}
-        {request.is_out_of_bkk ? (
-          <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] text-amber-700">นอก กทม.</span>
-        ) : null}
-        {request.is_weekend ? (
-          <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] text-amber-700">วันเสาร์-อาทิตย์</span>
-        ) : null}
-        {request.is_public_holiday ? (
-          <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] text-amber-700">วันหยุดนักขัตฤกษ์</span>
-        ) : null}
-        <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] text-slate-600">
-          {APPROVAL_TYPE[request.approval_type]?.label || 'รอตรวจสอบผู้อนุมัติ'}
-        </span>
-        <div className="ml-auto flex items-center gap-1.5">
-          <button
-            type="button"
-            onClick={onPrint}
-            className="rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-100"
-          >
-            📄 พิมพ์แบบ ๓ (A4)
+        <div className="flex flex-col-reverse gap-2 border-t border-slate-100 pt-4 sm:flex-row sm:justify-end">
+          <button type="button" onClick={onClose} className="rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50">
+            ปิด
           </button>
-          <button
-            type="button"
-            onClick={onOpen}
-            className="rounded-lg bg-brand-700 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-brand-800"
-          >
-            {canManageRequest ? 'จัดการคำขอ' : 'ดูรายละเอียด'}
+          <button type="submit" disabled={busy} className="rounded-xl bg-brand-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-brand-800 disabled:opacity-60">
+            {busy ? 'กำลังบันทึก...' : 'บันทึกการแก้ไข'}
           </button>
         </div>
-      </div>
-    </Card>
+      </form>
+    </Modal>
   )
 }
 

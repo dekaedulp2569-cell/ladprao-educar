@@ -10,7 +10,7 @@ import {
 } from '../_shared/line.ts'
 
 type Payload = {
-  type?: 'status' | 'driver_assigned'
+  type?: 'status' | 'driver_assigned' | 'request_reminder'
   request?: { id?: string }
 }
 
@@ -175,6 +175,78 @@ Deno.serve(async (req) => {
   const canManageRequest =
     profile.role === 'admin' ||
     (profile.role === 'head_of_dept' && request.approval_type === 'head_of_dept')
+
+  if (payload.type === 'request_reminder') {
+    if (profile.role !== 'admin') return json({ error: 'Admin access is required' }, 403)
+
+    const [{ data: requester, error: requesterError }, { data: driver, error: driverError }, { data: car, error: carError }] =
+      await Promise.all([
+        request.requester_auth_user_id
+          ? admin
+              .from('user_profiles')
+              .select('line_user_id')
+              .eq('auth_user_id', request.requester_auth_user_id)
+              .maybeSingle()
+          : Promise.resolve({ data: null, error: null }),
+        request.assigned_driver_id
+          ? admin
+              .from('drivers')
+              .select('full_name, phone, line_user_id')
+              .eq('id', request.assigned_driver_id)
+              .maybeSingle()
+          : Promise.resolve({ data: null, error: null }),
+        request.assigned_car_id
+          ? admin
+              .from('cars')
+              .select('license_plate, car_type')
+              .eq('id', request.assigned_car_id)
+              .maybeSingle()
+          : Promise.resolve({ data: null, error: null }),
+      ])
+    if (requesterError || driverError || carError) {
+      return json({ error: 'Unable to load notification recipients' }, 500)
+    }
+
+    const targets = new Map<string, string>()
+    const missingRecipients: string[] = []
+    const lineGroupId = groupId()
+    if (lineGroupId) targets.set(lineGroupId, 'กลุ่มฝ่ายการศึกษา')
+    else missingRecipients.push('กลุ่มฝ่ายการศึกษา (ไม่ได้ตั้งค่า LINE_GROUP_ID)')
+
+    if (requester?.line_user_id) targets.set(requester.line_user_id, 'ผู้ขอ')
+    else missingRecipients.push('ผู้ขอ (ไม่พบ LINE User ID)')
+
+    if (driver?.line_user_id) targets.set(driver.line_user_id, 'พนักงานขับรถ')
+    else if (request.assigned_driver_id || request.external_driver_name) {
+      missingRecipients.push('คนขับ (ไม่พบ LINE User ID ที่เชื่อมไว้)')
+    }
+
+    const carLabel = request.external_car_info ||
+      (car ? `${car.license_plate} (${car.car_type || 'รถ'})` : undefined)
+    const assignment = carLabel || driver?.full_name || request.external_driver_name
+      ? {
+          carLabel,
+          driverName: request.external_driver_name || driver?.full_name,
+          driverPhone: driver?.phone,
+        }
+      : undefined
+    const reminder = statusFlex(
+      request as CarRequestPayload,
+      `${STATUS_LABEL[String(request.status || '')] || 'อัปเดตสถานะ'} • แจ้งซ้ำ`,
+      assignment,
+    )
+    const notifications = await Promise.all(
+      [...targets].map(async ([recipient, target]) => ({
+        target,
+        result: await pushFlex(recipient, 'แจ้งเตือนคำขอใช้รถ', reminder),
+      })),
+    )
+    const failed =
+      missingRecipients.length > 0 ||
+      notifications.length === 0 ||
+      notifications.some(({ result }) => !result.ok)
+    return json({ ok: !failed, notifications, missingRecipients }, failed ? 502 : 200)
+  }
 
   if (request.status === 'cancelled') {
     if (profile.role !== 'admin' && request.requester_auth_user_id !== authData.user.id) {
