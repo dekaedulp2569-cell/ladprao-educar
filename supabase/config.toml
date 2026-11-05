@@ -1,2 +1,5 @@
 [functions.line-auth]
 verify_jwt = false
+
+[functions.line-webhook]
+verify_jwt = false
