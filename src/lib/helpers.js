@@ -1,35 +1,53 @@
 // รวมฟังก์ชันช่วยเหลือที่ใช้ร่วมกันทั่วทั้งแอป
 
+// สีสถานะกลาง ใช้ร่วมกันทั้งเว็บและ LINE เพื่อให้ทุกขั้นตอนสื่อความหมายเดียวกัน
+// ฟ้า = รอตรวจสอบ, เหลือง/ส้ม = รอ ผอ.เขต, เขียว = อนุมัติแล้ว,
+// แดง = ไม่อนุมัติ, เทา = ยกเลิกแล้ว
 export const STATUS = {
   pending: {
     label: 'รอตรวจสอบ',
     short: 'รอตรวจสอบ',
-    className: 'bg-brand-50 text-brand-800 border-brand-200',
-    dot: 'bg-brand-500',
+    className: 'bg-sky-50 text-sky-700 border-sky-200',
+    dot: 'bg-sky-500',
+    tone: 'sky',
+    emoji: '🔵',
+    hex: '#0284C7',
   },
   tentative: {
     label: 'รอ ผอ.เขต อนุมัติ',
     short: 'รอ ผอ.เขต',
     className: 'bg-amber-50 text-amber-700 border-amber-200',
     dot: 'bg-amber-500',
+    tone: 'amber',
+    emoji: '🟠',
+    hex: '#D97706',
   },
   approved: {
     label: 'อนุมัติแล้ว (ล็อกคิว)',
     short: 'อนุมัติแล้ว',
     className: 'bg-emerald-50 text-emerald-700 border-emerald-200',
     dot: 'bg-emerald-500',
+    tone: 'emerald',
+    emoji: '🟢',
+    hex: '#059669',
   },
   rejected: {
     label: 'ไม่อนุมัติ',
     short: 'ไม่อนุมัติ',
     className: 'bg-rose-50 text-rose-700 border-rose-200',
     dot: 'bg-rose-500',
+    tone: 'rose',
+    emoji: '🔴',
+    hex: '#E11D48',
   },
   cancelled: {
     label: 'ยกเลิกแล้ว',
     short: 'ยกเลิกแล้ว',
     className: 'bg-slate-100 text-slate-600 border-slate-300',
     dot: 'bg-slate-500',
+    tone: 'slate',
+    emoji: '⚫',
+    hex: '#475569',
   },
 }
 
@@ -58,10 +76,26 @@ export const ROLE = {
   driver: 'พนักงานขับรถ',
 }
 
+// ประเภทรถราชการ — ตอนเพิ่มรถให้พิมพ์ระบุเอง (ข้อความอิสระ) เพื่อให้ตรงกับเอกสารทางราชการ
+// CAR_TYPE ใช้เป็นคำแนะนำ/ตัวอย่างเท่านั้น ระบบอนุญาตให้ระบุข้อความใดก็ได้
 export const CAR_TYPE = {
   van: 'รถตู้',
   pickup: 'รถกระบะ',
-  other: 'อื่น ๆ',
+  sedan: 'รถเก๋ง',
+  bus: 'รถโดยสาร (รถบัส)',
+  other: 'รถอื่น ๆ',
+}
+
+/** ตัวเลือกตัวอย่างสำหรับแสดงใน UI (ไม่บังคับเลือกจากลิสต์) */
+export const CAR_TYPE_OPTIONS = Object.entries(CAR_TYPE).map(([value, label]) => ({
+  value,
+  label,
+}))
+
+/** แปลงรหัสประเภทรถเป็นข้อความแสดงผล (รองรับข้อความอิสระที่พิมพ์เอง) */
+export function carTypeDisplay(value) {
+  if (!value) return 'รถ'
+  return CAR_TYPE[value] || value
 }
 
 /** แปลงตัวเลขอารบิกเป็นเลขไทย */

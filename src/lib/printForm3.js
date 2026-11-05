@@ -1,4 +1,4 @@
-import { bangkokParts, CAR_TYPE, THAI_MONTHS_LONG, toThaiDigits } from './helpers.js'
+import { bangkokParts, carTypeDisplay, THAI_MONTHS_LONG, toThaiDigits } from './helpers.js'
 
 const OUT_OF_HOURS_RECIPIENT = 'ปลัดกรุงเทพมหานคร'
 const BUSINESS_HOURS_RECIPIENT = 'ผู้อำนวยการเขตลาดพร้าว'
@@ -49,7 +49,7 @@ export function generateForm3Html(request, car, driver, recipient) {
   const province = request.destination_province ? ` (${printable(request.destination_province)})` : ''
   const purpose = printable(request.purpose || '')
   const passengerCount = printable(request.passenger_count || 1)
-  const carType = printable(car ? (CAR_TYPE[car.car_type] || 'รถตู้') : 'รถตู้')
+  const carType = printable(car ? carTypeDisplay(car.car_type) : 'รถตู้')
   const carPlate = printable(car?.license_plate || request.external_car_info || '')
   const driverName = printable(driver?.full_name || request.external_driver_name || '')
 
@@ -390,14 +390,14 @@ export function generateForm3Html(request, car, driver, recipient) {
         <span>คน</span>
       </p>
       <p class="detail-row travel-row">
-        <span>ในวัน</span>
+        <span>ในวันที่</span>
         <span class="field-line travel-date-line">${startsAt.day}&nbsp;${startsAt.month}&nbsp;${startsAt.year}</span>
         <span>เวลา</span>
         <span class="field-line travel-time-line">${startsAt.time}</span>
         <span>น.</span>
       </p>
       <p class="detail-row travel-row">
-        <span>ถึงวัน</span>
+        <span>ถึงวันที่</span>
         <span class="field-line travel-date-line">${endsAt.day}&nbsp;${endsAt.month}&nbsp;${endsAt.year}</span>
         <span>เวลา</span>
         <span class="field-line travel-time-line">${endsAt.time}</span>

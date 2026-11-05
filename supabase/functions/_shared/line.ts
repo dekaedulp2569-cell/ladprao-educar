@@ -31,6 +31,27 @@ export function groupId() {
   return isValidLineId(gid) ? gid : ''
 }
 
+/**
+ * หากลุ่ม LINE เริ่มต้นจากตาราง line_groups (จัดการได้ในหน้าเว็บ)
+ * ถ้ายังไม่ได้ตั้งในฐานข้อมูล จะใช้ค่า LINE_GROUP_ID เดิมเป็นตัวสำรอง
+ */
+// deno-lint-ignore no-explicit-any
+export async function resolveGroupId(client?: any): Promise<string> {
+  if (!client) return groupId()
+  try {
+    const { data, error } = await client
+      .from('line_groups')
+      .select('group_id')
+      .eq('is_default', true)
+      .limit(1)
+      .maybeSingle()
+    if (!error && isValidLineId(data?.group_id)) return data.group_id.trim()
+  } catch (error) {
+    console.error('Unable to resolve default LINE group from database', error)
+  }
+  return groupId()
+}
+
 /** ส่งข้อความตัวอักษร 1 ข้อความไปยัง userId หรือ groupId */
 export async function pushText(to: string | undefined | null, text: string) {
   const token = Deno.env.get('LINE_CHANNEL_ACCESS_TOKEN')
@@ -192,6 +213,44 @@ export const STATUS_LABEL: Record<string, string> = {
   cancelled: 'ยกเลิกคำขอใช้รถ',
 }
 
+// สีสถานะกลาง ใช้ให้ตรงกับเว็บแอป (ฟ้า/ส้ม/เขียว/แดง/เทา)
+export const STATUS_COLOR: Record<string, string> = {
+  pending: '#0284C7',
+  tentative: '#D97706',
+  approved: '#059669',
+  rejected: '#E11D48',
+  cancelled: '#475569',
+}
+
+export const STATUS_EMOJI: Record<string, string> = {
+  pending: '🔵',
+  tentative: '🟠',
+  approved: '🟢',
+  rejected: '🔴',
+  cancelled: '⚫',
+}
+
+export function statusColor(status?: string | null) {
+  return STATUS_COLOR[String(status || '')] || '#475569'
+}
+
+export function statusEmoji(status?: string | null) {
+  return STATUS_EMOJI[String(status || '')] || '⚪'
+}
+
+export const CAR_TYPE_LABEL: Record<string, string> = {
+  van: 'รถตู้',
+  pickup: 'รถกระบะ',
+  sedan: 'รถเก๋ง',
+  bus: 'รถโดยสาร (รถบัส)',
+  other: 'รถอื่น ๆ',
+}
+
+export function carTypeLabel(value?: string | null) {
+  if (!value) return 'รถ'
+  return CAR_TYPE_LABEL[value] || value
+}
+
 export type CarRequestPayload = {
   doc_number?: string
   requester_name?: string
@@ -207,6 +266,41 @@ export type CarRequestPayload = {
   approval_type?: string
   external_car_info?: string | null
   external_driver_name?: string | null
+}
+
+/**
+ * สร้างข้อความรายละเอียดภารกิจรถราชการ ตามแบบฟอร์มที่กำหนด (เป็นบรรทัด)
+ * ใช้สำหรับสรุปงานประจำวัน และแจ้งเตือนก่อนเดินทาง
+ */
+export function buildMissionText({
+  index,
+  request,
+  carLabel,
+  driverLabel,
+}: {
+  index: number
+  request: CarRequestPayload
+  carLabel?: string
+  driverLabel?: string
+}): string {
+  const start = formatThaiTime(request.start_datetime)
+  const end = formatThaiTime(request.end_datetime)
+  const destination = `${request.destination || '-'}${
+    request.destination_province ? ` (${request.destination_province})` : ''
+  }`
+  const requester = request.requester_name || '-'
+  const driver = driverLabel || '-'
+  const vehicle = carLabel || '-'
+
+  return [
+    `ลำดับที่ ${index}`,
+    `เวลา ${start} - ${end} น.`,
+    `ปลายทาง : ${destination}`,
+    `ผู้ขอ : ${requester}`,
+    `พนักงานขับรถ : ${driver}`,
+    `ประเภทและหมายเลขทะเบียนรถ :`,
+    vehicle,
+  ].join('\n')
 }
 
 export function buildStatusMessage(request: CarRequestPayload, statusLabel: string) {

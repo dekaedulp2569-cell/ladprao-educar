@@ -1,12 +1,15 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import {
   STATUS_LABEL,
+  carTypeLabel,
   corsHeaders,
   formatThaiDateTimeRange,
-  groupId,
   isValidLineId,
   json,
   pushFlex,
+  resolveGroupId,
+  statusColor,
+  statusEmoji,
   type CarRequestPayload,
 } from '../_shared/line.ts'
 
@@ -43,7 +46,14 @@ function statusFlex(request: CarRequestPayload, statusLabel: string, assignment?
     { type: 'text', text: `ปลายทาง: ${request.destination || '-'} (${request.destination_province || '-'})`, size: 'sm', wrap: true },
     { type: 'text', text: `วันเวลา: ${formatThaiDateTimeRange(request.start_datetime, request.end_datetime)}`, size: 'sm', wrap: true },
     { type: 'text', text: `ผู้อนุมัติ: ${request.approval_type === 'district_director' ? 'ผู้อำนวยการเขต' : 'หัวหน้าฝ่ายการศึกษา'}`, size: 'xs', color: '#4B5563', wrap: true },
-    { type: 'text', text: `สถานะ: ${statusLabel}`, size: 'sm', weight: 'bold', color: '#D97706', wrap: true },
+    {
+      type: 'text',
+      text: `สถานะ: ${statusEmoji(request.status)} ${statusLabel}`,
+      size: 'sm',
+      weight: 'bold',
+      color: statusColor(request.status),
+      wrap: true,
+    },
   ]
 
   if (assignment) {
@@ -58,12 +68,7 @@ function statusFlex(request: CarRequestPayload, statusLabel: string, assignment?
     type: 'bubble',
     styles: {
       header: {
-        backgroundColor:
-          request.status === 'cancelled'
-            ? '#B91C1C'
-            : request.status === 'approved'
-              ? '#B45309'
-              : '#F59E0B',
+        backgroundColor: statusColor(request.status),
       },
     },
     header: {
@@ -71,7 +76,14 @@ function statusFlex(request: CarRequestPayload, statusLabel: string, assignment?
       layout: 'vertical',
       contents: [
         { type: 'text', text: 'EduLP Car • อัปเดตสถานะ', color: '#FEF3C7', size: 'xs', weight: 'bold' },
-        { type: 'text', text: statusLabel, color: '#FFFFFF', size: 'md', weight: 'bold', wrap: true },
+        {
+          type: 'text',
+          text: `${statusEmoji(request.status)} ${statusLabel}`,
+          color: '#FFFFFF',
+          size: 'md',
+          weight: 'bold',
+          wrap: true,
+        },
       ],
     },
     body: { type: 'box', layout: 'vertical', spacing: 'sm', contents: rows },
@@ -153,6 +165,9 @@ Deno.serve(async (req) => {
   if (requestError) return json({ error: 'Unable to load request' }, 500)
   if (!request) return json({ error: 'Request not found' }, 404)
 
+  // กลุ่มเริ่มต้นจัดการได้จากหน้าเว็บ (line_groups) และมี LINE_GROUP_ID เป็นตัวสำรอง
+  const lineGroupId = await resolveGroupId(admin)
+
   if (payload.type === 'driver_assigned') {
     if (profile.role !== 'admin') return json({ error: 'Admin access is required' }, 403)
     if (request.status !== 'approved') {
@@ -177,12 +192,12 @@ Deno.serve(async (req) => {
     if (request.assigned_driver_id && !driver) return json({ error: 'Assigned driver not found' }, 404)
 
     const carLabel = request.external_car_info ||
-      (car ? `${car.license_plate} (${car.car_type || 'รถ'})` : 'ไม่ระบุรถ')
+      (car ? `${car.license_plate} (${carTypeLabel(car.car_type)})` : 'ไม่ระบุรถ')
     const requestData = request as CarRequestPayload
     const destination =
       driver?.dept === 'education' && driver?.line_user_id && isValidLineId(driver.line_user_id)
         ? driver.line_user_id
-        : groupId()
+        : lineGroupId
 
     if (!destination) {
       return json({
@@ -195,7 +210,7 @@ Deno.serve(async (req) => {
       'ใบสั่งงานพนักงานขับรถ',
       driverFlex(requestData, carLabel, driver?.full_name || request.external_driver_name || 'พนักงานขับรถ'),
     )
-    return json({ target: destination === groupId() ? 'group' : 'driver_private', result }, result.ok ? 200 : 502)
+    return json({ target: destination === lineGroupId ? 'group' : 'driver_private', result }, result.ok ? 200 : 502)
   }
 
   const canManageRequest =
@@ -236,7 +251,6 @@ Deno.serve(async (req) => {
 
     const targets = new Map<string, string>()
     const missingRecipients: string[] = []
-    const lineGroupId = groupId()
     if (lineGroupId) {
       targets.set(lineGroupId, 'กลุ่มฝ่ายการศึกษา')
     } else {
@@ -257,7 +271,7 @@ Deno.serve(async (req) => {
     }
 
     const carLabel = request.external_car_info ||
-      (car ? `${car.license_plate} (${car.car_type || 'รถ'})` : undefined)
+      (car ? `${car.license_plate} (${carTypeLabel(car.car_type)})` : undefined)
     const assignment = carLabel || driver?.full_name || request.external_driver_name
       ? {
           carLabel,
@@ -295,11 +309,13 @@ Deno.serve(async (req) => {
 
     const [{ data: requester, error: requesterError }, { data: driver, error: driverError }, { data: car, error: carError }] =
       await Promise.all([
-        admin
-          .from('user_profiles')
-          .select('line_user_id')
-          .eq('auth_user_id', request.requester_auth_user_id)
-          .maybeSingle(),
+        request.requester_auth_user_id
+          ? admin
+              .from('user_profiles')
+              .select('line_user_id')
+              .eq('auth_user_id', request.requester_auth_user_id)
+              .maybeSingle()
+          : Promise.resolve({ data: null, error: null }),
         request.assigned_driver_id
           ? admin
               .from('drivers').select('full_name, line_user_id')
@@ -315,7 +331,7 @@ Deno.serve(async (req) => {
     }
 
     const carLabel = request.external_car_info ||
-      (car ? `${car.license_plate} (${car.car_type || 'รถ'})` : 'ไม่ระบุรถ')
+      (car ? `${car.license_plate} (${carTypeLabel(car.car_type)})` : 'ไม่ระบุรถ')
     const cancellationMessage = statusFlex(
       request as CarRequestPayload,
       'ยกเลิกคำขอใช้รถ',
@@ -327,19 +343,11 @@ Deno.serve(async (req) => {
     )
     const targets = new Map<string, string>()
     const missingRecipients: string[] = []
-    const lineGroupId = groupId()
     if (lineGroupId) targets.set(lineGroupId, 'กลุ่มฝ่ายการศึกษา')
     else missingRecipients.push('กลุ่มฝ่ายการศึกษา (ยังไม่ได้เชื่อมกลุ่ม LINE: ดึงบอทเข้ากลุ่มแล้วนำ Group ID ที่ขึ้นต้นด้วย C มาใส่ใน LINE_GROUP_ID)')
 
-    if (request.requester_auth_user_id) {
-      const { data: requester, error: requesterError } = await admin
-        .from('user_profiles')
-        .select('line_user_id')
-        .eq('auth_user_id', request.requester_auth_user_id)
-        .maybeSingle()
-      if (requesterError) return json({ error: 'Unable to load requester LINE profile' }, 500)
-      if (requester?.line_user_id && isValidLineId(requester.line_user_id)) targets.set(requester.line_user_id, 'ผู้ขอ')
-      else missingRecipients.push('ผู้ขอใช้รถ (ยังไม่ได้เชื่อม LINE: ให้ผู้ขอเปิดเว็บแล้วกด "เข้าสู่ระบบด้วย LINE")')
+    if (requester?.line_user_id && isValidLineId(requester.line_user_id)) {
+      targets.set(requester.line_user_id, 'ผู้ขอ')
     } else {
       missingRecipients.push('ผู้ขอใช้รถ (ยังไม่ได้เชื่อม LINE: ให้ผู้ขอเปิดเว็บแล้วกด "เข้าสู่ระบบด้วย LINE")')
     }
@@ -368,7 +376,6 @@ Deno.serve(async (req) => {
   if (request.status === 'pending' || request.status === 'tentative') {
     const targets = new Map<string, string>()
     const missingRecipients: string[] = []
-    const lineGroupId = groupId()
     if (lineGroupId) targets.set(lineGroupId, 'กลุ่มฝ่ายการศึกษา')
     else missingRecipients.push('กลุ่มฝ่ายการศึกษา (ไม่ได้ตั้งค่า LINE_GROUP_ID)')
 
@@ -429,13 +436,15 @@ Deno.serve(async (req) => {
     if (carError || driverError) return json({ error: 'Unable to load assignment details' }, 500)
     assignment = {
       carLabel: request.external_car_info ||
-        (car ? `${car.license_plate} (${car.car_type || 'รถ'})` : undefined),
+        (car ? `${car.license_plate} (${carTypeLabel(car.car_type)})` : undefined),
       driverName: request.external_driver_name || driver?.full_name,
       driverPhone: driver?.phone,
     }
   }
 
-  const targets = new Map<string, string>([[requester.line_user_id, 'ผู้ขอ']])
+  const targets = new Map<string, string>()
+  if (lineGroupId) targets.set(lineGroupId, 'กลุ่มฝ่ายการศึกษา')
+  targets.set(requester.line_user_id, 'ผู้ขอ')
   const missingRecipients: string[] = []
   addRelatedRecipients(request, targets, missingRecipients)
 

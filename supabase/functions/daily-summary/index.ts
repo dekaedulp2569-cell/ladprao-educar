@@ -1,24 +1,27 @@
 // Supabase Edge Function: daily-summary
-// สรุปงานของพนักงานขับรถประจำวัน เวลา 15:00 น. (Asia/Bangkok)
+// สรุปงานของวันถัดไป เวลา 16:00 น. (Asia/Bangkok)
+// ส่งเข้ากลุ่ม LINE เริ่มต้น + คนขับรถ + ผู้ที่เกี่ยวข้อง + ผู้ขอใช้รถ
 //
 // ต้องตั้งค่า secrets:
-//   LINE_CHANNEL_ACCESS_TOKEN, LINE_GROUP_ID
+//   LINE_CHANNEL_ACCESS_TOKEN, LINE_GROUP_ID (ตัวสำรอง), CRON_SECRET (แนะนำ)
 //   SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY (มีให้อัตโนมัติใน Edge Function)
-//   CRON_SECRET (แนะนำ) — ต้องส่ง header x-cron-secret ตรงกัน
 //
-// ตั้งเวลาเรียกด้วย pg_cron + pg_net ดูตัวอย่างใน supabase/functions/README.md
+// ตั้งเวลาเรียกด้วย pg_cron + pg_net (09:00 UTC = 16:00 Asia/Bangkok)
+// ดูตัวอย่างใน supabase/functions/README.md
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import {
+  buildMissionText,
+  carTypeLabel,
   corsHeaders,
   formatThaiDate,
-  formatThaiTime,
-  groupId,
   json,
   pushFlex,
+  resolveGroupId,
 } from '../_shared/line.ts'
 
 const BANGKOK_OFFSET_MINUTES = 7 * 60
+const SUMMARY_COLOR = '#047857'
 
 function bangkokDateKey(date: Date) {
   const local = new Date(date.getTime() + BANGKOK_OFFSET_MINUTES * 60 * 1000)
@@ -43,7 +46,14 @@ function summaryContents(title: string, lines: string[], color: string) {
           type: 'box',
           layout: 'vertical',
           contents: [
-            { type: 'text', text: 'EduLP Car • สรุปงานประจำวัน (15:00 น.)', color: '#FEF3C7', size: 'xs', weight: 'bold', wrap: true },
+            {
+              type: 'text',
+              text: 'EduLP Car • สรุปงานประจำวัน (16:00 น.)',
+              color: '#D1FAE5',
+              size: 'xs',
+              weight: 'bold',
+              wrap: true,
+            },
             { type: 'text', text: title, color: '#FFFFFF', size: 'md', weight: 'bold', wrap: true },
           ],
         },
@@ -59,13 +69,23 @@ function summaryContents(title: string, lines: string[], color: string) {
                 color: '#374151',
                 wrap: true,
               }))
-            : [{ type: 'text', text: 'ไม่มีรายการที่ได้รับอนุมัติสำหรับวันพรุ่งนี้', size: 'sm', color: '#4B5563', wrap: true }],
+            : [
+                {
+                  type: 'text',
+                  text: 'ไม่มีรายการที่ได้รับอนุมัติสำหรับวันพรุ่งนี้',
+                  size: 'sm',
+                  color: '#4B5563',
+                  wrap: true,
+                },
+              ],
         },
       })
     }
     return cards.length === 1 ? cards[0] : { type: 'carousel', contents: cards }
   })
 }
+
+type Recipient = { label: string; lines: string[] }
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -128,10 +148,11 @@ Deno.serve(async (req) => {
 
   if (error) return json({ error: error.message }, 500)
 
-  const [{ data: cars, error: carsError }, { data: drivers, error: driversError }] = await Promise.all([
-    supabase.from('cars').select('*'),
-    supabase.from('drivers').select('*'),
-  ])
+  const [{ data: cars, error: carsError }, { data: drivers, error: driversError }] =
+    await Promise.all([
+      supabase.from('cars').select('*'),
+      supabase.from('drivers').select('*'),
+    ])
   if (carsError || driversError) {
     return json({ error: 'Unable to load vehicle and driver details' }, 500)
   }
@@ -139,40 +160,82 @@ Deno.serve(async (req) => {
   const carById = new Map((cars || []).map((car) => [car.id, car]))
   const driverById = new Map((drivers || []).map((driver) => [driver.id, driver]))
 
-  const personal = new Map<string, string[]>()
+  // รวมผู้รับเป็นรายคน เพื่อไม่ให้ส่งซ้ำเมื่อคนเดียวมีหลายบทบาท
+  const personal = new Map<string, Recipient>()
   const groupLines: string[] = []
 
-  for (const job of jobs || []) {
+  const addPersonalLine = (lineUserId: string, label: string, line: string) => {
+    if (!lineUserId) return
+    const current = personal.get(lineUserId)
+    if (current) {
+      if (!current.lines.includes(line)) current.lines.push(line)
+      return
+    }
+    personal.set(lineUserId, { label, lines: [line] })
+  }
+
+  for (let i = 0; i < (jobs || []).length; i += 1) {
+    const job = jobs[i]
     const driver = job.assigned_driver_id ? driverById.get(job.assigned_driver_id) : null
     const car = job.assigned_car_id ? carById.get(job.assigned_car_id) : null
     const carLabel = car
-      ? `${car.license_plate} (${car.car_type === 'van' ? 'รถตู้' : car.car_type === 'pickup' ? 'รถกระบะ' : 'รถ'})`
+      ? `${car.license_plate} (${carTypeLabel(car.car_type)})`
       : job.external_car_info || 'ไม่ระบุรถ'
-
-    const line = `• ${formatThaiTime(job.start_datetime)} - ${formatThaiTime(job.end_datetime)} น. ${job.destination} (${job.destination_province}) · ${job.requester_name}`
     const driverLabel = driver?.full_name || job.external_driver_name || 'ยังไม่ระบุคนขับ'
-    groupLines.push(
-      `${line} · ${carLabel} · ${driverLabel}`,
-    )
 
-    if (driver?.dept === 'education' && driver.line_user_id) {
-      if (!personal.has(driver.line_user_id)) personal.set(driver.line_user_id, [])
-      personal.get(driver.line_user_id)!.push(line)
+    const missionText = buildMissionText({
+      index: i + 1,
+      request: job as Record<string, unknown>,
+      carLabel,
+      driverLabel,
+    })
+    groupLines.push(missionText)
+
+    if (driver?.line_user_id) {
+      addPersonalLine(driver.line_user_id, 'งานขับรถของคุณ', missionText)
+    }
+
+    if (Array.isArray(job.related_line_user_ids)) {
+      for (const relatedId of job.related_line_user_ids) {
+        if (typeof relatedId === 'string' && relatedId.trim()) {
+          addPersonalLine(relatedId.trim(), 'รายการใช้รถที่คุณเกี่ยวข้อง', missionText)
+        }
+      }
+    }
+
+    if (job.requester_auth_user_id) {
+      const { data: requester } = await supabase
+        .from('user_profiles')
+        .select('line_user_id')
+        .eq('auth_user_id', job.requester_auth_user_id)
+        .maybeSingle()
+      if (requester?.line_user_id) {
+        addPersonalLine(requester.line_user_id, 'คำขอใช้รถของคุณ', missionText)
+      }
     }
   }
 
   const results: unknown[] = []
   const dayLabel = formatThaiDate(dayStart)
+  const lineGroupId = await resolveGroupId(supabase)
 
-  for (const [lineUserId, lines] of personal) {
-    for (const contents of summaryContents(`งานขับรถของคุณ • ${dayLabel}`, lines, '#D97706')) {
+  for (const [lineUserId, recipient] of personal) {
+    for (const contents of summaryContents(
+      `${recipient.label} • ${dayLabel}`,
+      recipient.lines,
+      SUMMARY_COLOR,
+    )) {
       results.push(await pushFlex(lineUserId, `สรุปงานประจำวัน ${dayLabel}`, contents))
     }
   }
 
-  for (const contents of summaryContents(`ภารกิจรถราชการ • ${dayLabel}`, groupLines, '#D97706')) {
+  for (const contents of summaryContents(
+    `ภารกิจรถราชการ • ${dayLabel}`,
+    groupLines,
+    SUMMARY_COLOR,
+  )) {
     results.push(
-      await pushFlex(groupId(), `สรุปตารางการใช้รถราชการวันพรุ่งนี้ ${dayLabel}`, contents),
+      await pushFlex(lineGroupId, `สรุปตารางการใช้รถราชการวันพรุ่งนี้ ${dayLabel}`, contents),
     )
   }
 
@@ -180,11 +243,15 @@ Deno.serve(async (req) => {
     (result) => typeof result === 'object' && result !== null && 'ok' in result && !result.ok,
   )
 
-  return json({
-    date: dayKey,
-    jobs: jobs?.length || 0,
-    personalDrivers: personal.size,
-    groupJobs: groupLines.length,
-    results,
-  }, failed ? 502 : 200)
+  return json(
+    {
+      date: dayKey,
+      jobs: jobs?.length || 0,
+      personalRecipients: personal.size,
+      groupJobs: groupLines.length,
+      groupConfigured: Boolean(lineGroupId),
+      results,
+    },
+    failed ? 502 : 200,
+  )
 })

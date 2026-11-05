@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
 import {
-  CAR_TYPE,
+  carTypeDisplay,
   dateKey,
   formatDate,
   formatDateTimeRange,
@@ -143,7 +143,7 @@ function JobSection({ title, subtitle, jobs, cars, emptyText, muted }) {
                     📅 {formatDateTimeRange(job.start_datetime, job.end_datetime)}
                   </p>
                   <p className="mt-1 text-xs text-slate-500">
-                    🚐 {car ? `${car.license_plate} (${CAR_TYPE[car.car_type] || 'รถ'})` : job.external_car_info || 'ยังไม่ระบุรถ'} · 👤 {job.requester_name}
+                    🚐 {car ? `${car.license_plate} (${carTypeDisplay(car.car_type)})` : job.external_car_info || 'ยังไม่ระบุรถ'} · 👤 {job.requester_name}
                   </p>
                 </div>
                 <StatusBadge status={job.status} />

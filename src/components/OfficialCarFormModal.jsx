@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { bangkokParts, CAR_TYPE, THAI_MONTHS_LONG, toThaiDigits } from '../lib/helpers'
+import { bangkokParts, carTypeDisplay, THAI_MONTHS_LONG, toThaiDigits } from '../lib/helpers'
 import { openForm3PrintWindow } from '../lib/printForm3'
 
 export function OfficialCarFormModal({ open, onClose, request, car, driver }) {
@@ -43,7 +43,7 @@ export function OfficialCarFormModal({ open, onClose, request, car, driver }) {
 
   const passengerCount = toThaiDigits(request.passenger_count || 1)
   const carPlate = toThaiDigits(car?.license_plate || request.external_car_info || '')
-  const carTypeLabel = car ? (CAR_TYPE[car.car_type] || 'รถตู้') : 'รถตู้'
+  const carTypeLabel = car ? carTypeDisplay(car.car_type) : 'รถตู้'
   const driverName = driver?.full_name || request.external_driver_name || ''
 
   return (
@@ -160,7 +160,7 @@ export function OfficialCarFormModal({ open, onClose, request, car, driver }) {
           </div>
 
           <div className="flex flex-wrap items-baseline gap-2">
-            <span>ในวัน</span>
+            <span>ในวันที่</span>
             <span className="min-w-[3rem] border-b border-dotted border-slate-700 text-center font-semibold text-slate-900">
               {startDay}
             </span>
@@ -180,7 +180,7 @@ export function OfficialCarFormModal({ open, onClose, request, car, driver }) {
           </div>
 
           <div className="flex flex-wrap items-baseline gap-2">
-            <span>ถึงวัน</span>
+            <span>ถึงวันที่</span>
             <span className="min-w-[3rem] border-b border-dotted border-slate-700 text-center font-semibold text-slate-900">
               {endDay}
             </span>

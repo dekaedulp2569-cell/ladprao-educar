@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
-import { APPROVAL_TYPE, formatDate, formatDateTimeRange } from '../lib/helpers'
+import { APPROVAL_TYPE, STATUS, formatDate, formatDateTimeRange } from '../lib/helpers'
 import { notifyLine } from '../lib/line'
-import { Card, EmptyState, SectionTitle, Spinner, StatusBadge } from './ui'
+import { Card, EmptyState, SectionTitle, Spinner, StatusBadge, StatusLegend } from './ui'
 import { OfficialCarFormModal } from './OfficialCarFormModal'
 import { openForm3PrintWindow } from '../lib/printForm3'
 
@@ -108,12 +108,17 @@ export function MyRequests() {
       ) : null}
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
-        <SummaryCard label="รอตรวจสอบ" value={summary.pending} className="bg-brand-50 text-brand-800" />
-        <SummaryCard label="รอ ผอ.เขต" value={summary.tentative} className="bg-amber-50 text-amber-700" />
-        <SummaryCard label="อนุมัติแล้ว" value={summary.approved} className="bg-emerald-50 text-emerald-700" />
-        <SummaryCard label="ไม่อนุมัติ" value={summary.rejected} className="bg-rose-50 text-rose-700" />
-        <SummaryCard label="ยกเลิกแล้ว" value={summary.cancelled} className="bg-slate-100 text-slate-600" />
+        <SummaryCard label="รอตรวจสอบ" value={summary.pending} className={STATUS.pending.className} />
+        <SummaryCard label="รอ ผอ.เขต" value={summary.tentative} className={STATUS.tentative.className} />
+        <SummaryCard label="อนุมัติแล้ว" value={summary.approved} className={STATUS.approved.className} />
+        <SummaryCard label="ไม่อนุมัติ" value={summary.rejected} className={STATUS.rejected.className} />
+        <SummaryCard label="ยกเลิกแล้ว" value={summary.cancelled} className={STATUS.cancelled.className} />
       </div>
+
+      <Card className="p-3">
+        <p className="mb-2 text-xs font-semibold text-slate-500">ความหมายของสีสถานะ</p>
+        <StatusLegend />
+      </Card>
 
       <Card className="p-4 sm:p-5">
         <SectionTitle title="รายการทั้งหมด" subtitle={`${requests.length} รายการ`} />

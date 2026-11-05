@@ -27,7 +27,7 @@ CREATE TABLE cars (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     license_plate VARCHAR(50) NOT NULL,            -- เลขทะเบียนรถ เช่น ฮว 4098
     province VARCHAR(100) DEFAULT 'กรุงเทพมหานคร', -- จังหวัด
-    car_type VARCHAR(20) CHECK (car_type IN ('van', 'pickup', 'other')), -- ประเภทรถ (รถตู้, รถกระบะ)
+    car_type VARCHAR(50), -- ประเภทรถ (ระบุข้อความอิสระ เช่น รถตู้, รถกระบะ, รถบัส เพื่อตรงกับเอกสารทางราชการ)
     owner_dept VARCHAR(20) DEFAULT 'education' CHECK (owner_dept IN ('education', 'external')),
     created_at TIMESTAMPTZ DEFAULT NOW()
 );

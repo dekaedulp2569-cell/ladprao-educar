@@ -1,25 +1,43 @@
-import { classNames } from '../lib/helpers'
+import { STATUS, classNames } from '../lib/helpers'
 
 export function StatusBadge({ status, className }) {
-  const map = {
-    pending: { label: 'รอตรวจสอบ', cls: 'bg-brand-50 text-brand-800 border-brand-200', dot: 'bg-brand-500' },
-    tentative: { label: 'รอ ผอ.เขต อนุมัติ', cls: 'bg-amber-50 text-amber-700 border-amber-200', dot: 'bg-amber-500' },
-    approved: { label: 'อนุมัติแล้ว (ล็อกคิว)', cls: 'bg-emerald-50 text-emerald-700 border-emerald-200', dot: 'bg-emerald-500' },
-    rejected: { label: 'ไม่อนุมัติ', cls: 'bg-rose-50 text-rose-700 border-rose-200', dot: 'bg-rose-500' },
-    cancelled: { label: 'ยกเลิกแล้ว', cls: 'bg-slate-100 text-slate-600 border-slate-300', dot: 'bg-slate-500' },
-  }
-  const item = map[status] || { label: status || '-', cls: 'bg-slate-100 text-slate-600 border-slate-200', dot: 'bg-slate-400' }
+  const item =
+    STATUS[status] || {
+      label: status || '-',
+      className: 'bg-slate-100 text-slate-600 border-slate-200',
+      dot: 'bg-slate-400',
+    }
   return (
     <span
       className={classNames(
         'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium whitespace-nowrap',
-        item.cls,
+        item.className,
         className,
       )}
     >
       <span className={classNames('h-1.5 w-1.5 rounded-full', item.dot)} />
       {item.label}
     </span>
+  )
+}
+
+/** คำอธิบายสีสถานะ ใช้แสดงใต้หัวตารางเพื่อให้อ่านสถานะได้ทันที */
+export function StatusLegend({ className }) {
+  return (
+    <div className={classNames('flex flex-wrap items-center gap-1.5', className)}>
+      {Object.entries(STATUS).map(([value, item]) => (
+        <span
+          key={value}
+          className={classNames(
+            'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium',
+            item.className,
+          )}
+        >
+          <span className={classNames('h-1.5 w-1.5 rounded-full', item.dot)} />
+          {item.label}
+        </span>
+      ))}
+    </div>
   )
 }
 

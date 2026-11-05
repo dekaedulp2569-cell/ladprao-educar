@@ -6,6 +6,7 @@ import { PROVINCES } from '../lib/provinces'
 import {
   APPROVAL_TYPE,
   DOC_TYPE,
+  STATUS,
   formatDate,
   includesWeekend,
   isOutOfBkk,
@@ -16,7 +17,6 @@ import {
   toISO,
 } from '../lib/helpers'
 import { Alert, Card, SectionTitle } from './ui'
-import { OfficialCarFormModal } from './OfficialCarFormModal'
 import { RelatedPeoplePicker } from './RelatedPeoplePicker'
 import { openForm3PrintWindow } from '../lib/printForm3'
 
@@ -50,7 +50,6 @@ export function CarRequestForm({ onSubmitted }) {
   const [errors, setErrors] = useState({})
   const [submitting, setSubmitting] = useState(false)
   const [submitted, setSubmitted] = useState(null)
-  const [showPrintForm, setShowPrintForm] = useState(false)
   const [serverError, setServerError] = useState('')
   const [lineNotification, setLineNotification] = useState(null)
   const [resendingNotification, setResendingNotification] = useState(false)
@@ -245,9 +244,10 @@ export function CarRequestForm({ onSubmitted }) {
                 <p className="text-xs text-slate-500">วันที่ยื่นคำขอ</p>
                 <p className="font-semibold text-slate-800">{requestDateLabel}</p>
               </div>
-              <div className="rounded-xl bg-slate-50 px-4 py-3">
-                <p className="text-xs text-slate-500">สถานะ</p>
-                <p className={`font-semibold ${tentative ? 'text-amber-600' : 'text-brand-700'}`}>
+              <div className={`rounded-xl border px-4 py-3 ${(tentative ? STATUS.tentative : STATUS.pending).className}`}>
+                <p className="text-xs opacity-80">สถานะ</p>
+                <p className="font-semibold">
+                  {(tentative ? STATUS.tentative : STATUS.pending).emoji}{' '}
                   {tentative ? 'รอ ผอ.เขต อนุมัติ (Tentative)' : 'รอตรวจสอบ (Pending)'}
                 </p>
               </div>
@@ -287,38 +287,22 @@ export function CarRequestForm({ onSubmitted }) {
               </Alert>
             )}
 
-            <div className="rounded-xl border border-brand-200 bg-brand-50/70 p-4 text-center">
-              <p className="text-sm font-semibold text-brand-900">เอกสารสำหรับลงนามสั่งใช้รถ</p>
-              <p className="mt-1 text-xs text-brand-700">สามารถเปิดดูและสั่งพิมพ์ &quot;แบบ ๓ ใบขออนุญาตใช้รถส่วนกลาง&quot; (หน้าเว็บ A4 / เลขไทย) เพื่อนำไปเสนอผู้บังคับบัญชาลงนามได้ทันที</p>
-              <div className="mt-3 flex flex-wrap justify-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => openForm3PrintWindow(submitted)}
-                  className="inline-flex items-center gap-2 rounded-xl bg-brand-700 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-800"
-                >
-                  🖨️ เปิดหน้าพิมพ์แบบ ๓ (A4)
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setShowPrintForm(true)}
-                  className="inline-flex items-center gap-1.5 rounded-xl border border-brand-300 bg-white px-4 py-2.5 text-sm font-semibold text-brand-800 shadow-sm transition hover:bg-brand-50"
-                >
-                  📄 ดูตัวอย่างเอกสาร
-                </button>
-              </div>
+            <div className="rounded-xl border border-emerald-200 bg-emerald-50/70 p-4 text-center">
+              <p className="text-sm font-semibold text-emerald-900">เอกสารสำหรับลงนามสั่งใช้รถ</p>
+              <p className="mt-1 text-xs text-emerald-700">
+                เปิด &quot;แบบ ๓ ใบขออนุญาตใช้รถส่วนกลาง&quot; (A4 / เลขไทย) ในแท็บใหม่
+                เพื่อพิมพ์และนำไปเสนอผู้บังคับบัญชาลงนาม
+              </p>
+              <button
+                type="button"
+                onClick={() => openForm3PrintWindow(submitted)}
+                className="mt-3 inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-6 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-700"
+              >
+                🖨️ พิมพ์แบบ ๓ (A4)
+              </button>
             </div>
 
             <div className="flex flex-col gap-2 sm:flex-row">
-              <button
-                type="button"
-                onClick={() => {
-                  setSubmitted(null)
-                  setLineNotification(null)
-                }}
-                className="flex-1 rounded-xl bg-slate-800 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-900"
-              >
-                ยื่นคำขอใหม่
-              </button>
               <button
                 type="button"
                 onClick={() => {
@@ -328,17 +312,11 @@ export function CarRequestForm({ onSubmitted }) {
                 }}
                 className="flex-1 rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
               >
-                ดูปฏิทินการใช้รถ
+                ปิดและดูปฏิทินการใช้รถ
               </button>
             </div>
           </div>
         </Card>
-
-        <OfficialCarFormModal
-          open={showPrintForm}
-          onClose={() => setShowPrintForm(false)}
-          request={submitted}
-        />
       </div>
     )
   }

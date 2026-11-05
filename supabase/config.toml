@@ -3,3 +3,11 @@ verify_jwt = false
 
 [functions.line-webhook]
 verify_jwt = false
+
+# ฟังก์ชันที่เรียกจาก pg_cron ใช้ x-cron-secret หรือ Supabase user token
+# (ตรวจสิทธิ์ภายในฟังก์ชันอีกชั้นหนึ่ง)
+[functions.daily-summary]
+verify_jwt = false
+
+[functions.trip-reminders]
+verify_jwt = false

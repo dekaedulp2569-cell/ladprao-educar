@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import {
-  CAR_TYPE,
   STATUS,
   classNames,
+  carTypeDisplay,
   dateKey,
   formatDate,
   formatTime,
@@ -194,7 +194,7 @@ export function PublicCalendar() {
               <option value="all">รถทุกคัน</option>
               {cars.map((car) => (
                 <option key={car.id} value={car.id}>
-                  {car.license_plate} · {CAR_TYPE[car.car_type] || 'รถ'}
+                  {car.license_plate} · {carTypeDisplay(car.car_type)}
                 </option>
               ))}
             </select>
@@ -336,7 +336,7 @@ export function PublicCalendar() {
                         <span className="w-5 text-center text-slate-400">🚐</span>
                         <div className="flex-1">
                           <span className="font-semibold text-slate-800">
-                            {car ? `${car.license_plate} (${CAR_TYPE[car.car_type] || 'รถ'})` : event.external_car_info || 'ยังไม่ระบุรถ'}
+                            {car ? `${car.license_plate} (${carTypeDisplay(car.car_type)})` : event.external_car_info || 'ยังไม่ระบุรถ'}
                           </span>
                         </div>
                       </div>

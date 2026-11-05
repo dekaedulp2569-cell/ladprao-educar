@@ -5,8 +5,10 @@ import { buildStatusMessage, notifyLine } from '../lib/line'
 import {
   APPROVAL_TYPE,
   CAR_TYPE,
+  CAR_TYPE_OPTIONS,
   DOC_TYPE,
   classNames,
+  carTypeDisplay,
   currentFiscalYear,
   downloadCsv,
   fiscalYearOf,
@@ -17,10 +19,11 @@ import {
   toISO,
 } from '../lib/helpers'
 import { PROVINCES } from '../lib/provinces'
-import { Alert, Card, EmptyState, Modal, SectionTitle, Spinner, StatusBadge } from './ui'
+import { Alert, Card, EmptyState, Modal, SectionTitle, Spinner, StatusBadge, StatusLegend } from './ui'
 import { OfficialCarFormModal } from './OfficialCarFormModal'
 import { RelatedPeoplePicker } from './RelatedPeoplePicker'
 import { MembersPanel } from './MembersPanel'
+import { LineGroupsPanel } from './LineGroupsPanel'
 import { openForm3PrintWindow } from '../lib/printForm3'
 
 const STATUS_TABS = [
@@ -412,7 +415,7 @@ export function AdminDashboard() {
       {notice ? <Alert tone="success">{notice}</Alert> : null}
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
-        <StatCard label="รอตรวจสอบ" value={counts.pending} tone="brand" />
+        <StatCard label="รอตรวจสอบ" value={counts.pending} tone="sky" />
         <StatCard label="รอ ผอ.เขต อนุมัติ" value={counts.tentative} tone="amber" />
         <StatCard label="อนุมัติแล้ว" value={counts.approved} tone="emerald" />
         <StatCard label="ไม่อนุมัติ" value={counts.rejected} tone="rose" />
@@ -426,6 +429,7 @@ export function AdminDashboard() {
             ? [
                 { value: 'resources', label: 'รถและคนขับ' },
                 { value: 'members', label: 'จัดการสมาชิก' },
+                { value: 'lineGroups', label: 'กลุ่ม LINE' },
                 { value: 'reports', label: 'รายงานและจัดการข้อมูล' },
               ]
             : []),
@@ -481,6 +485,14 @@ export function AdminDashboard() {
             </div>
           </Card>
 
+          <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3">
+            <div>
+              <p className="text-xs font-semibold text-slate-600">สีสถานะในระบบ</p>
+              <p className="text-[11px] text-slate-400">ใช้สีเดียวกันกับข้อความแจ้งเตือนใน LINE</p>
+            </div>
+            <StatusLegend />
+          </div>
+
           {filtered.length === 0 ? (
             <EmptyState title="ไม่พบรายการคำขอ" description="ลองเปลี่ยนตัวกรองสถานะหรือคำค้นหา" />
           ) : (
@@ -521,7 +533,7 @@ export function AdminDashboard() {
                           </p>
                         </td>
                         <td className="px-4 py-3 text-xs text-slate-600">
-                          <p>{car ? `${car.license_plate} (${CAR_TYPE[car.car_type] || 'รถ'})` : request.external_car_info || 'ยังไม่จัดสรรรถ'}</p>
+                          <p>{car ? `${car.license_plate} (${carTypeDisplay(car.car_type)})` : request.external_car_info || 'ยังไม่จัดสรรรถ'}</p>
                           <p className="mt-1">{driver?.full_name || request.external_driver_name || 'ยังไม่จัดสรรคนขับ'}</p>
                         </td>
                         <td className="px-4 py-3"><StatusBadge status={request.status} /></td>
@@ -589,6 +601,8 @@ export function AdminDashboard() {
         />
       ) : tab === 'members' ? (
         <MembersPanel onError={setError} />
+      ) : tab === 'lineGroups' ? (
+        <LineGroupsPanel onError={setError} />
       ) : (
         <ReportsPanel
           requests={requests}
@@ -648,6 +662,7 @@ export function AdminDashboard() {
 function StatCard({ label, value, tone }) {
   const tones = {
     brand: 'bg-brand-50 text-brand-800 ring-brand-100',
+    sky: 'bg-sky-50 text-sky-700 ring-sky-100',
     amber: 'bg-amber-50 text-amber-700 ring-amber-100',
     emerald: 'bg-emerald-50 text-emerald-700 ring-emerald-100',
     rose: 'bg-rose-50 text-rose-700 ring-rose-100',
@@ -953,7 +968,7 @@ function RequestDetail({
                   <option value="">-- เลือกรถ --</option>
                   {cars.map((item) => (
                     <option key={item.id} value={item.id}>
-                      {item.license_plate} · {CAR_TYPE[item.car_type] || 'รถ'} · {item.province}
+                      {item.license_plate} · {carTypeDisplay(item.car_type) || 'รถ'} · {item.province}
                     </option>
                   ))}
                 </select>
@@ -1024,7 +1039,7 @@ function RequestDetail({
         {(car || driver || request.external_car_info || request.external_driver_name) ? (
           <div className="rounded-xl bg-slate-50 px-4 py-3 text-sm text-slate-600">
             <p>
-              🚐 {car ? `${car.license_plate} (${CAR_TYPE[car.car_type] || 'รถ'})` : request.external_car_info || '-'}
+              🚐 {car ? `${car.license_plate} (${carTypeDisplay(car.car_type)})` : request.external_car_info || '-'}
             </p>
             <p className="mt-1">
               🧑‍✈️ {driver ? driver.full_name : request.external_driver_name || '-'}
@@ -1086,7 +1101,7 @@ function ResourcesPanel({ cars, drivers, onReload, onError }) {
   const [carForm, setCarForm] = useState({
     license_plate: '',
     province: 'กรุงเทพมหานคร',
-    car_type: 'van',
+    car_type: '',
     owner_dept: 'education',
   })
   const [driverForm, setDriverForm] = useState({
@@ -1274,7 +1289,7 @@ function ResourcesPanel({ cars, drivers, onReload, onError }) {
                 <div>
                   <p className="text-sm font-semibold text-slate-800">{car.license_plate}</p>
                   <p className="text-xs text-slate-500">
-                    {CAR_TYPE[car.car_type] || 'รถ'} · {car.province} ·{' '}
+                    {carTypeDisplay(car.car_type) || 'รถ'} · {car.province} ·{' '}
                     {car.owner_dept === 'education' ? 'รถฝ่ายเรา' : 'รถยืมฝ่ายอื่น'}
                   </p>
                 </div>
@@ -1309,15 +1324,13 @@ function ResourcesPanel({ cars, drivers, onReload, onError }) {
               placeholder="เลขทะเบียน เช่น ฮว 4098"
               className={selectClass}
             />
-            <select
+            <input
               value={carForm.car_type}
-              onChange={(event) => setCarForm({ ...carForm, car_type: event.target.value })}
+              onChange={(event) => setCarForm({ ...carForm, car_type: event.target.value.trim() })}
+              placeholder="ระบุประเภทรถ เช่น รถตู้, รถกระบะ, รถบัส"
               className={selectClass}
-            >
-              <option value="van">รถตู้</option>
-              <option value="pickup">รถกระบะ</option>
-              <option value="other">อื่น ๆ</option>
-            </select>
+              aria-label="ประเภทรถ"
+            />
             <input
               list="car-province-list"
               value={carForm.province}
@@ -1457,15 +1470,15 @@ function ResourcesPanel({ cars, drivers, onReload, onError }) {
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="mb-1 block text-xs font-semibold text-slate-700">ประเภทรถ</label>
-              <select
-                value={editCarForm.car_type}
-                onChange={(e) => setEditCarForm({ ...editCarForm, car_type: e.target.value })}
-                className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-brand-500"
-              >
-                <option value="van">รถตู้</option>
-                <option value="pickup">รถกระบะ</option>
-                <option value="other">อื่น ๆ</option>
-              </select>
+              <div>
+                <label className="mb-1 block text-xs font-semibold text-slate-700">ประเภทรถ</label>
+                <input
+                  value={editCarForm.car_type}
+                  onChange={(e) => setEditCarForm({ ...editCarForm, car_type: e.target.value.trim() })}
+                  placeholder="ระบุประเภทรถ เช่น รถตู้, รถกระบะ"
+                  className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-brand-500"
+                />
+              </div>
             </div>
             <div>
               <label className="mb-1 block text-xs font-semibold text-slate-700">สังกัดรถ</label>
@@ -1624,7 +1637,7 @@ function ReportsPanel({ requests, cars, drivers, onReload, onError }) {
           formatDate(item.start_datetime, true),
           formatDate(item.end_datetime, true),
           item.passenger_count,
-          car ? `${car.license_plate} (${CAR_TYPE[car.car_type] || 'รถ'})` : item.external_car_info || '',
+          car ? `${car.license_plate} (${carTypeDisplay(car.car_type)})` : item.external_car_info || '',
           driver ? driver.full_name : item.external_driver_name || '',
           item.status,
           APPROVAL_TYPE[item.approval_type]?.label || '',
