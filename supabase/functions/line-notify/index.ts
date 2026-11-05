@@ -4,6 +4,7 @@ import {
   corsHeaders,
   formatThaiDateTimeRange,
   groupId,
+  isValidLineId,
   json,
   pushFlex,
   type CarRequestPayload,
@@ -163,7 +164,16 @@ Deno.serve(async (req) => {
       (car ? `${car.license_plate} (${car.car_type || 'รถ'})` : 'ไม่ระบุรถ')
     const requestData = request as CarRequestPayload
     const destination =
-      driver?.dept === 'education' && driver?.line_user_id ? driver.line_user_id : groupId()
+      driver?.dept === 'education' && driver?.line_user_id && isValidLineId(driver.line_user_id)
+        ? driver.line_user_id
+        : groupId()
+
+    if (!destination) {
+      return json({
+        ok: false,
+        error: `คนขับรถ (${driver?.full_name || request.external_driver_name || 'คนขับ'}) ยังไม่ได้เชื่อม LINE และยังไม่ได้ตั้งค่ากลุ่ม LINE (วิธีเชื่อม: ให้คนขับเปิดเว็บแล้วกด 'เข้าสู่ระบบด้วย LINE' หรือให้แอดมินนำ LINE User ID มากรอกในเมนูบุคลากร)`,
+      }, 422)
+    }
     const result = await pushFlex(
       destination,
       'ใบสั่งงานพนักงานขับรถ',
@@ -210,15 +220,23 @@ Deno.serve(async (req) => {
     const targets = new Map<string, string>()
     const missingRecipients: string[] = []
     const lineGroupId = groupId()
-    if (lineGroupId) targets.set(lineGroupId, 'กลุ่มฝ่ายการศึกษา')
-    else missingRecipients.push('กลุ่มฝ่ายการศึกษา (ไม่ได้ตั้งค่า LINE_GROUP_ID)')
+    if (lineGroupId) {
+      targets.set(lineGroupId, 'กลุ่มฝ่ายการศึกษา')
+    } else {
+      missingRecipients.push('กลุ่มฝ่ายการศึกษา (ยังไม่ได้เชื่อมกลุ่ม LINE: ดึงบอทเข้ากลุ่มแล้วนำ Group ID ที่ขึ้นต้นด้วย C มาใส่ใน LINE_GROUP_ID)')
+    }
 
-    if (requester?.line_user_id) targets.set(requester.line_user_id, 'ผู้ขอ')
-    else missingRecipients.push('ผู้ขอ (ไม่พบ LINE User ID)')
+    if (requester?.line_user_id && isValidLineId(requester.line_user_id)) {
+      targets.set(requester.line_user_id, 'ผู้ขอ')
+    } else {
+      missingRecipients.push('ผู้ขอใช้รถ (ยังไม่ได้เชื่อม LINE: ให้ผู้ขอเปิดเว็บแล้วกด "เข้าสู่ระบบด้วย LINE")')
+    }
 
-    if (driver?.line_user_id) targets.set(driver.line_user_id, 'พนักงานขับรถ')
-    else if (request.assigned_driver_id || request.external_driver_name) {
-      missingRecipients.push('คนขับ (ไม่พบ LINE User ID ที่เชื่อมไว้)')
+    if (driver?.line_user_id && isValidLineId(driver.line_user_id)) {
+      targets.set(driver.line_user_id, 'พนักงานขับรถ')
+    } else if (request.assigned_driver_id || request.external_driver_name) {
+      const dName = driver?.full_name || request.external_driver_name || 'คนขับ'
+      missingRecipients.push(`คนขับรถ ${dName} (ยังไม่ได้เชื่อม LINE: ให้คนขับเปิดเว็บกด "เข้าสู่ระบบด้วย LINE" หรือแอดมินนำ LINE User ID มากรอกในแท็บบุคลากร)`)
     }
 
     const carLabel = request.external_car_info ||
@@ -241,11 +259,15 @@ Deno.serve(async (req) => {
         result: await pushFlex(recipient, 'แจ้งเตือนคำขอใช้รถ', reminder),
       })),
     )
-    const failed =
-      missingRecipients.length > 0 ||
-      notifications.length === 0 ||
-      notifications.some(({ result }) => !result.ok)
-    return json({ ok: !failed, notifications, missingRecipients }, failed ? 502 : 200)
+    const allFailed = targets.size === 0 || (notifications.length > 0 && notifications.every(({ result }) => !result.ok))
+    return json({
+      ok: !allFailed,
+      notifications,
+      missingRecipients,
+      error: allFailed
+        ? `ยังไม่มีผู้รับที่เชื่อมต่อ LINE:\n• ${missingRecipients.join('\n• ')}`
+        : undefined,
+    }, allFailed ? 422 : 200)
   }
 
   if (request.status === 'cancelled') {
@@ -286,12 +308,24 @@ Deno.serve(async (req) => {
         driverPhone: driver?.phone,
       },
     )
-    const targets = new Map<string, string>([[groupId(), 'กลุ่มฝ่ายการศึกษา']])
+    const targets = new Map<string, string>()
     const missingRecipients: string[] = []
-    if (requester?.line_user_id) targets.set(requester.line_user_id, 'ผู้ขอ')
-    else missingRecipients.push('ผู้ขอ (ไม่พบ LINE User ID)')
-    if (driver?.line_user_id) targets.set(driver.line_user_id, 'พนักงานขับรถ')
-    else if (request.assigned_driver_id) missingRecipients.push('พนักงานขับรถ (ไม่พบ LINE User ID)')
+    const lineGroupId = groupId()
+    if (lineGroupId) targets.set(lineGroupId, 'กลุ่มฝ่ายการศึกษา')
+    else missingRecipients.push('กลุ่มฝ่ายการศึกษา (ยังไม่ได้เชื่อมกลุ่ม LINE: ดึงบอทเข้ากลุ่มแล้วนำ Group ID ที่ขึ้นต้นด้วย C มาใส่ใน LINE_GROUP_ID)')
+
+    if (request.requester_auth_user_id) {
+      const { data: requester, error: requesterError } = await admin
+        .from('user_profiles')
+        .select('line_user_id')
+        .eq('auth_user_id', request.requester_auth_user_id)
+        .maybeSingle()
+      if (requesterError) return json({ error: 'Unable to load requester LINE profile' }, 500)
+      if (requester?.line_user_id && isValidLineId(requester.line_user_id)) targets.set(requester.line_user_id, 'ผู้ขอ')
+      else missingRecipients.push('ผู้ขอใช้รถ (ยังไม่ได้เชื่อม LINE: ให้ผู้ขอเปิดเว็บแล้วกด "เข้าสู่ระบบด้วย LINE")')
+    } else {
+      missingRecipients.push('ผู้ขอใช้รถ (ยังไม่ได้เชื่อม LINE: ให้ผู้ขอเปิดเว็บแล้วกด "เข้าสู่ระบบด้วย LINE")')
+    }
 
     const notifications = await Promise.all(
       [...targets].map(async ([recipient, label]) => ({
@@ -356,8 +390,11 @@ Deno.serve(async (req) => {
     .eq('auth_user_id', request.requester_auth_user_id)
     .maybeSingle()
   if (requesterError) return json({ error: 'Unable to load requester LINE profile' }, 500)
-  if (!requester?.line_user_id) {
-    return json({ error: 'Requester LINE account is not linked' }, 422)
+  if (!requester?.line_user_id || !isValidLineId(requester.line_user_id)) {
+    return json({
+      ok: false,
+      error: 'ผู้ขอใช้รถยังไม่ได้เชื่อมต่อ LINE (วิธีเชื่อม: ให้ผู้ขอเปิดเว็บแล้วกด "เข้าสู่ระบบด้วย LINE")',
+    }, 422)
   }
 
   let assignment: { carLabel?: string; driverName?: string; driverPhone?: string } | undefined

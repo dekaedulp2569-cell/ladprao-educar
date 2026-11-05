@@ -17,8 +17,8 @@ async function getFunctionErrorReason(error) {
   if (response instanceof Response) {
     try {
       const body = await response.clone().json()
+      if (typeof body?.error === 'string') return body.error
       const reasons = [
-        body.error,
         ...(body.missingRecipients || []),
         ...(body.notifications || [])
           .filter(({ result }) => !result?.ok)

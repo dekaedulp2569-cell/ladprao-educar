@@ -135,14 +135,20 @@ export function AdminDashboard() {
 
     if (!result?.ok) {
       setError(
-        `ส่ง LINE ไม่ครบ: ${
-          result?.reason || 'ตรวจสอบ LINE User ID ของผู้เกี่ยวข้องและ LINE_GROUP_ID'
+        `แจ้งเตือน LINE: ${
+          result?.reason || 'ยังไม่ได้เชื่อมต่อ LINE'
         }`,
       )
       return false
     }
 
-    setNotice(successMessage)
+    if (result?.missingRecipients?.length > 0) {
+      setNotice(
+        `${successMessage} (หมายเหตุ: มีผู้ที่ยังไม่ได้รับ: ${result.missingRecipients.join(' · ')})`,
+      )
+    } else {
+      setNotice(successMessage)
+    }
     return true
   }
 

@@ -21,8 +21,14 @@ export function lineReady() {
   return Boolean(Deno.env.get('LINE_CHANNEL_ACCESS_TOKEN'))
 }
 
+export function isValidLineId(id?: string | null): boolean {
+  if (!id) return false
+  return /^[CUR][0-9a-f]{32}$/i.test(id.trim())
+}
+
 export function groupId() {
-  return Deno.env.get('LINE_GROUP_ID') || ''
+  const gid = Deno.env.get('LINE_GROUP_ID')?.trim() || ''
+  return isValidLineId(gid) ? gid : ''
 }
 
 /** ส่งข้อความตัวอักษร 1 ข้อความไปยัง userId หรือ groupId */
@@ -31,8 +37,8 @@ export async function pushText(to: string | undefined | null, text: string) {
   if (!token) {
     return { ok: false, skipped: true, reason: 'ยังไม่ได้ตั้งค่า LINE_CHANNEL_ACCESS_TOKEN' }
   }
-  if (!to) {
-    return { ok: false, skipped: true, reason: 'ไม่พบผู้รับข้อความ (to)' }
+  if (!to || !isValidLineId(to)) {
+    return { ok: false, skipped: true, reason: 'LINE ID ผู้รับไม่ถูกต้องหรือไม่พบผู้รับ (to)' }
   }
 
   const response = await fetch(PUSH_ENDPOINT, {
@@ -67,8 +73,8 @@ export async function pushFlex(
   if (!token) {
     return { ok: false, skipped: true, reason: 'ยังไม่ได้ตั้งค่า LINE_CHANNEL_ACCESS_TOKEN' }
   }
-  if (!to) {
-    return { ok: false, skipped: true, reason: 'ไม่พบผู้รับข้อความ (to)' }
+  if (!to || !isValidLineId(to)) {
+    return { ok: false, skipped: true, reason: 'LINE ID ผู้รับไม่ถูกต้องหรือไม่พบผู้รับ (to)' }
   }
 
   const response = await fetch(PUSH_ENDPOINT, {
