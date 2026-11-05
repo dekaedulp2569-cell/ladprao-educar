@@ -148,8 +148,7 @@ Deno.serve(async (req) => {
     const [{ data: driver, error: driverError }, { data: car, error: carError }] = await Promise.all([
       request.assigned_driver_id
         ? admin
-            .from('drivers')
-            .select('full_name, phone, dept, line_user_id')
+            .from('drivers').select('full_name, dept, line_user_id')
             .eq('id', request.assigned_driver_id)
             .maybeSingle()
         : Promise.resolve({ data: null, error: null }),
@@ -200,8 +199,7 @@ Deno.serve(async (req) => {
           : Promise.resolve({ data: null, error: null }),
         request.assigned_driver_id
           ? admin
-              .from('drivers')
-              .select('full_name, phone, line_user_id')
+              .from('drivers').select('full_name, line_user_id')
               .eq('id', request.assigned_driver_id)
               .maybeSingle()
           : Promise.resolve({ data: null, error: null }),
@@ -214,7 +212,9 @@ Deno.serve(async (req) => {
           : Promise.resolve({ data: null, error: null }),
       ])
     if (requesterError || driverError || carError) {
-      return json({ error: 'Unable to load notification recipients' }, 500)
+      console.error('Recipients error:', { requesterError, driverError, carError })
+      const detail = requesterError?.message || driverError?.message || carError?.message || 'ไม่ทราบสาเหตุ'
+      return json({ error: `ไม่สามารถโหลดข้อมูลผู้รับแจ้งเตือน: ${detail}` }, 500)
     }
 
     const targets = new Map<string, string>()
@@ -284,8 +284,7 @@ Deno.serve(async (req) => {
           .maybeSingle(),
         request.assigned_driver_id
           ? admin
-              .from('drivers')
-              .select('full_name, phone, line_user_id')
+              .from('drivers').select('full_name, line_user_id')
               .eq('id', request.assigned_driver_id)
               .maybeSingle()
           : Promise.resolve({ data: null, error: null }),
@@ -404,7 +403,7 @@ Deno.serve(async (req) => {
         ? admin.from('cars').select('license_plate, car_type').eq('id', request.assigned_car_id).maybeSingle()
         : Promise.resolve({ data: null, error: null }),
       request.assigned_driver_id
-        ? admin.from('drivers').select('full_name, phone').eq('id', request.assigned_driver_id).maybeSingle()
+        ? admin.from('drivers').select('full_name').eq('id', request.assigned_driver_id).maybeSingle()
         : Promise.resolve({ data: null, error: null }),
     ])
     if (carError || driverError) return json({ error: 'Unable to load assignment details' }, 500)
