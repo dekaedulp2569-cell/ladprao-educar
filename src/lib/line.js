@@ -62,6 +62,7 @@ export function buildStatusMessage(request, statusLabel) {
     '🚗 ระบบขอใช้รถ ฝ่ายการศึกษา สำนักงานเขตลาดพร้าว',
     `เลขที่เอกสาร: ${request.doc_number || '-'}`,
     `ผู้ขอ: ${request.requester_name || '-'}`,
+    `วัตถุประสงค์: ${request.purpose || '-'}`,
     `ปลายทาง: ${request.destination || '-'} (${request.destination_province || '-'})`,
     `วันเวลา: ${formatDateTimeRange(request.start_datetime, request.end_datetime)}`,
     `สถานะล่าสุด: ${statusLabel}`,

@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext'
 import { APPROVAL_TYPE, STATUS, formatDate, formatDateTimeRange } from '../lib/helpers'
 import { notifyLine } from '../lib/line'
 import { Card, EmptyState, SectionTitle, Spinner, StatusBadge, StatusLegend } from './ui'
+import { NotificationPopup } from './NotificationPopup'
 import { OfficialCarFormModal } from './OfficialCarFormModal'
 import { openForm3PrintWindow } from '../lib/printForm3'
 
@@ -15,6 +16,7 @@ export function MyRequests() {
   const [printRequest, setPrintRequest] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [notice, setNotice] = useState('')
   const [cancellingId, setCancellingId] = useState(null)
 
   const cancelApprovedRequest = async (request) => {
@@ -53,7 +55,9 @@ export function MyRequests() {
 
     const notification = await notifyLine({ type: 'status', request: cancelled })
     if (notification?.ok === false || notification?.skipped) {
-      setError('ยกเลิกคำขอแล้ว แต่ส่งการแจ้งเตือน LINE ไม่สำเร็จ กรุณาแจ้งกลุ่มฝ่ายด้วยตนเอง')
+      setNotice('ยกเลิกคำขอแล้ว แต่ส่งการแจ้งเตือน LINE ไม่สำเร็จ กรุณาแจ้งกลุ่มฝ่ายด้วยตนเอง')
+    } else {
+      setNotice('ยกเลิกคำขอเรียบร้อยแล้ว และแจ้งเตือนทาง LINE แล้ว')
     }
   }
 
@@ -103,9 +107,8 @@ export function MyRequests() {
         </p>
       </div>
 
-      {error ? (
-        <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{error}</div>
-      ) : null}
+      <NotificationPopup open={Boolean(error)} message={error || ''} type="danger" onClose={() => setError('')} />
+      <NotificationPopup open={Boolean(notice)} message={notice || ''} type="success" onClose={() => setNotice('')} />
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
         <SummaryCard label="รอตรวจสอบ" value={summary.pending} className={STATUS.pending.className} />

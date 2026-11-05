@@ -20,6 +20,7 @@ import {
 } from '../lib/helpers'
 import { PROVINCES } from '../lib/provinces'
 import { Alert, Card, EmptyState, Modal, SectionTitle, Spinner, StatusBadge, StatusLegend } from './ui'
+import { NotificationPopup } from './NotificationPopup'
 import { OfficialCarFormModal } from './OfficialCarFormModal'
 import { RelatedPeoplePicker } from './RelatedPeoplePicker'
 import { MembersPanel } from './MembersPanel'
@@ -411,8 +412,8 @@ export function AdminDashboard() {
         </div>
       </div>
 
-      {error ? <Alert tone="danger">{error}</Alert> : null}
-      {notice ? <Alert tone="success">{notice}</Alert> : null}
+      <NotificationPopup open={Boolean(error)} message={error || ''} type="danger" onClose={() => setError('')} />
+      <NotificationPopup open={Boolean(notice)} message={notice || ''} type="success" onClose={() => setNotice('')} />
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
         <StatCard label="รอตรวจสอบ" value={counts.pending} tone="sky" />

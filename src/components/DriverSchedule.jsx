@@ -8,6 +8,7 @@ import {
   formatDateTimeRange,
 } from '../lib/helpers'
 import { Card, EmptyState, SectionTitle, Spinner, StatusBadge } from './ui'
+import { NotificationPopup } from './NotificationPopup'
 
 export function DriverSchedule() {
   const { session } = useAuth()
@@ -16,6 +17,7 @@ export function DriverSchedule() {
   const [driverId, setDriverId] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [notice, setNotice] = useState('')
 
   useEffect(() => {
     const load = async () => {
@@ -87,9 +89,8 @@ export function DriverSchedule() {
         </p>
       </div>
 
-      {error ? (
-        <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{error}</div>
-      ) : null}
+      <NotificationPopup open={Boolean(error)} message={error || ''} type="danger" onClose={() => setError('')} />
+      <NotificationPopup open={Boolean(notice)} message={notice || ''} type="success" onClose={() => setNotice('')} />
 
       <div className="grid grid-cols-3 gap-3">
         <div className="rounded-2xl bg-brand-50 p-4 ring-1 ring-brand-100">

@@ -17,6 +17,7 @@ import {
   toISO,
 } from '../lib/helpers'
 import { Alert, Card, SectionTitle } from './ui'
+import { NotificationPopup } from './NotificationPopup'
 import { RelatedPeoplePicker } from './RelatedPeoplePicker'
 import { openForm3PrintWindow } from '../lib/printForm3'
 
@@ -214,16 +215,12 @@ export function CarRequestForm({ onSubmitted }) {
           </div>
           <div className="space-y-4 p-6">
             {lineNotification ? (
-              <div
-                role="status"
-                className={`rounded-xl border px-4 py-3 text-sm ${
-                  lineNotification.ok
-                    ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
-                    : 'border-amber-200 bg-amber-50 text-amber-800'
-                }`}
-              >
-                {lineNotification.message}
-              </div>
+              <NotificationPopup
+                open={true}
+                message={lineNotification.message}
+                type={lineNotification.ok ? 'success' : 'warning'}
+                onClose={() => setLineNotification(null)}
+              />
             ) : null}
             {lineNotification && !lineNotification.ok ? (
               <button

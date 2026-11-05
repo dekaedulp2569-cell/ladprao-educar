@@ -43,6 +43,7 @@ function statusFlex(request: CarRequestPayload, statusLabel: string, assignment?
   const rows: Record<string, unknown>[] = [
     { type: 'text', text: `เลขที่เอกสาร: ${request.doc_number || '-'}`, size: 'xs', color: '#6B7280', wrap: true },
     { type: 'text', text: `ผู้ขอ: ${request.requester_name || '-'}`, size: 'sm', weight: 'bold', wrap: true },
+    { type: 'text', text: `วัตถุประสงค์: ${request.purpose || '-'}`, size: 'sm', wrap: true },
     { type: 'text', text: `ปลายทาง: ${request.destination || '-'} (${request.destination_province || '-'})`, size: 'sm', wrap: true },
     { type: 'text', text: `วันเวลา: ${formatThaiDateTimeRange(request.start_datetime, request.end_datetime)}`, size: 'sm', wrap: true },
     { type: 'text', text: `ผู้อนุมัติ: ${request.approval_type === 'district_director' ? 'ผู้อำนวยการเขต' : 'หัวหน้าฝ่ายการศึกษา'}`, size: 'xs', color: '#4B5563', wrap: true },
@@ -109,6 +110,7 @@ function driverFlex(request: CarRequestPayload, carLabel: string, driverName: st
       contents: [
         { type: 'text', text: `วันเวลา: ${formatThaiDateTimeRange(request.start_datetime, request.end_datetime)}`, size: 'md', weight: 'bold', wrap: true },
         { type: 'text', text: `รถ: ${carLabel}`, size: 'md', wrap: true },
+        { type: 'text', text: `วัตถุประสงค์: ${request.purpose || '-'}`, size: 'md', wrap: true },
         { type: 'text', text: `ปลายทาง: ${request.destination || '-'} (${request.destination_province || '-'})`, size: 'md', wrap: true },
         { type: 'text', text: `ผู้ติดต่อ: ${request.requester_name || '-'}${request.phone ? ` (${request.phone})` : ''}`, size: 'md', color: '#2563EB', weight: 'bold', wrap: true },
         { type: 'text', text: `พนักงานขับรถ: ${driverName}`, size: 'sm', color: '#4B5563', wrap: true },

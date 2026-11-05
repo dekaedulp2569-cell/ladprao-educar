@@ -266,6 +266,7 @@ export type CarRequestPayload = {
   approval_type?: string
   external_car_info?: string | null
   external_driver_name?: string | null
+  purpose?: string
 }
 
 /**
@@ -291,12 +292,14 @@ export function buildMissionText({
   const requester = request.requester_name || '-'
   const driver = driverLabel || '-'
   const vehicle = carLabel || '-'
+  const purpose = request.purpose || '-'
 
   return [
     `ลำดับที่ ${index}`,
     `เวลา ${start} - ${end} น.`,
     `ปลายทาง : ${destination}`,
     `ผู้ขอ : ${requester}`,
+    `วัตถุประสงค์ : ${purpose}`,
     `พนักงานขับรถ : ${driver}`,
     `ประเภทและหมายเลขทะเบียนรถ :`,
     vehicle,
@@ -308,6 +311,7 @@ export function buildStatusMessage(request: CarRequestPayload, statusLabel: stri
     '🚗 ระบบขอใช้รถ ฝ่ายการศึกษา สำนักงานเขตลาดพร้าว',
     `เลขที่เอกสาร: ${request.doc_number || '-'}`,
     `ผู้ขอ: ${request.requester_name || '-'}`,
+    `วัตถุประสงค์: ${request.purpose || '-'}`,
     `ปลายทาง: ${request.destination || '-'} (${request.destination_province || '-'})`,
     `วันเวลา: ${formatThaiDateTimeRange(request.start_datetime, request.end_datetime)}`,
     `สถานะล่าสุด: ${statusLabel}`,
