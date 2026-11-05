@@ -267,6 +267,9 @@ export type CarRequestPayload = {
   external_car_info?: string | null
   external_driver_name?: string | null
   purpose?: string
+  pickup_location?: string
+  passenger_name?: string
+  passenger_phone?: string
 }
 
 /**
@@ -311,6 +314,7 @@ export function buildStatusMessage(request: CarRequestPayload, statusLabel: stri
     '🚗 ระบบขอใช้รถ ฝ่ายการศึกษา สำนักงานเขตลาดพร้าว',
     `เลขที่เอกสาร: ${request.doc_number || '-'}`,
     `ผู้ขอ: ${request.requester_name || '-'}`,
+    `จุดรับ: ${request.pickup_location || '-'}`,
     `วัตถุประสงค์: ${request.purpose || '-'}`,
     `ปลายทาง: ${request.destination || '-'} (${request.destination_province || '-'})`,
     `วันเวลา: ${formatThaiDateTimeRange(request.start_datetime, request.end_datetime)}`,

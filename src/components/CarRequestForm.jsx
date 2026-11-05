@@ -31,6 +31,9 @@ const emptyForm = {
   phone: '',
   destination: '',
   destination_province: 'กรุงเทพมหานคร',
+  pickup_location: 'สำนักงานเขตลาดพร้าว',
+  passenger_name: '',
+  passenger_phone: '',
   start_datetime: '',
   end_datetime: '',
   passenger_count: 1,
@@ -145,6 +148,9 @@ export function CarRequestForm({ onSubmitted }) {
       phone: form.phone.trim() || null,
       destination: form.destination.trim(),
       destination_province: form.destination_province,
+      pickup_location: form.pickup_location.trim(),
+      passenger_name: form.passenger_name.trim() || null,
+      passenger_phone: form.passenger_phone.trim() || null,
       start_datetime: toISO(form.start_datetime),
       end_datetime: toISO(form.end_datetime),
       passenger_count: Number(form.passenger_count),
@@ -452,6 +458,27 @@ export function CarRequestForm({ onSubmitted }) {
                   <option key={province} value={province} />
                 ))}
               </datalist>
+            </Field>
+            <Field label="สถานที่รับ (ต้นทาง)" required>
+              <input
+                value={form.pickup_location}
+                onChange={(event) => update('pickup_location', event.target.value)}
+                className={inputClass}
+              />
+            </Field>
+            <Field label="ชื่อผู้ประสานงานหน้างาน">
+              <input
+                value={form.passenger_name}
+                onChange={(event) => update('passenger_name', event.target.value)}
+                className={inputClass}
+              />
+            </Field>
+            <Field label="เบอร์โทรผู้ประสานงาน">
+              <input
+                value={form.passenger_phone}
+                onChange={(event) => update('passenger_phone', event.target.value)}
+                className={inputClass}
+              />
             </Field>
             <Field label="จำนวนผู้โดยสาร" required error={errors.passenger_count}>
               <input

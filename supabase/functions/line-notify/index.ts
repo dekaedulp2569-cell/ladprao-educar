@@ -43,6 +43,7 @@ function statusFlex(request: CarRequestPayload, statusLabel: string, assignment?
   const rows: Record<string, unknown>[] = [
     { type: 'text', text: `เลขที่เอกสาร: ${request.doc_number || '-'}`, size: 'xs', color: '#6B7280', wrap: true },
     { type: 'text', text: `ผู้ขอ: ${request.requester_name || '-'}`, size: 'sm', weight: 'bold', wrap: true },
+    { type: 'text', text: `จุดรับ: ${request.pickup_location || '-'}`, size: 'sm', wrap: true },
     { type: 'text', text: `วัตถุประสงค์: ${request.purpose || '-'}`, size: 'sm', wrap: true },
     { type: 'text', text: `ปลายทาง: ${request.destination || '-'} (${request.destination_province || '-'})`, size: 'sm', wrap: true },
     { type: 'text', text: `วันเวลา: ${formatThaiDateTimeRange(request.start_datetime, request.end_datetime)}`, size: 'sm', wrap: true },
@@ -110,9 +111,10 @@ function driverFlex(request: CarRequestPayload, carLabel: string, driverName: st
       contents: [
         { type: 'text', text: `วันเวลา: ${formatThaiDateTimeRange(request.start_datetime, request.end_datetime)}`, size: 'md', weight: 'bold', wrap: true },
         { type: 'text', text: `รถ: ${carLabel}`, size: 'md', wrap: true },
+        { type: 'text', text: `จุดรับ: ${request.pickup_location || '-'}`, size: 'md', wrap: true },
         { type: 'text', text: `วัตถุประสงค์: ${request.purpose || '-'}`, size: 'md', wrap: true },
         { type: 'text', text: `ปลายทาง: ${request.destination || '-'} (${request.destination_province || '-'})`, size: 'md', wrap: true },
-        { type: 'text', text: `ผู้ติดต่อ: ${request.requester_name || '-'}${request.phone ? ` (${request.phone})` : ''}`, size: 'md', color: '#2563EB', weight: 'bold', wrap: true },
+        { type: 'text', text: `ผู้ประสานงาน: ${request.passenger_name || '-'} ${request.passenger_phone ? `(${request.passenger_phone})` : ''}`, size: 'md', color: '#2563EB', weight: 'bold', wrap: true },
         { type: 'text', text: `พนักงานขับรถ: ${driverName}`, size: 'sm', color: '#4B5563', wrap: true },
       ],
     },
@@ -182,8 +184,9 @@ Deno.serve(async (req) => {
     const [{ data: driver, error: driverError }, { data: car, error: carError }] = await Promise.all([
       request.assigned_driver_id
         ? admin
-            .from('drivers').select('full_name, dept, line_user_id')
+            .from('user_profiles').select('full_name, nickname, phone, line_user_id, driver_dept_type')
             .eq('id', request.assigned_driver_id)
+            .eq('role', 'driver')
             .maybeSingle()
         : Promise.resolve({ data: null, error: null }),
       request.assigned_car_id
@@ -211,7 +214,7 @@ Deno.serve(async (req) => {
     const result = await pushFlex(
       driverLineId,
       'ใบสั่งงานพนักงานขับรถ',
-      driverFlex(requestData, carLabel, driver?.full_name || request.external_driver_name || 'พนักงานขับรถ'),
+      driverFlex(requestData, carLabel, driver ? (driver.nickname ? `${driver.nickname} - ${driver.full_name}` : driver.full_name) : request.external_driver_name || 'พนักงานขับรถ'),
     )
     return json({ target: 'driver_private', result }, result.ok ? 200 : 502)
   }

@@ -62,7 +62,7 @@ export function AdminDashboard() {
     const [requestResult, carResult, driverResult] = await Promise.all([
       supabase.from('car_requests').select('*').order('created_at', { ascending: false }),
       supabase.from('cars').select('*').order('created_at', { ascending: true }),
-      supabase.from('admin_drivers').select('*').order('created_at', { ascending: true }),
+      supabase.from('user_profiles').select('*').eq('role', 'driver').eq('status', 'active').order('full_name', { ascending: true }),
     ])
 
     if (requestResult.error || carResult.error || driverResult.error) {
@@ -1019,11 +1019,23 @@ function RequestDetail({
                   className={selectClass}
                 >
                   <option value="">-- เลือกพนักงานขับรถ --</option>
-                  {drivers.map((item) => (
-                    <option key={item.id} value={item.id}>
-                      {item.full_name}{item.nickname ? ` (${item.nickname})` : ''}
-                    </option>
-                  ))}
+                  {/* กลุ่มที่ 1: ฝ่ายการศึกษา (แสดงก่อน) */}
+                  {drivers
+                    .filter((d) => d.driver_dept_type === 'education')
+                    .map((item) => (
+                      <option key={item.id} value={item.id}>
+                        {(item.nickname ? item.nickname + ' - ' : '') + item.full_name} ({item.phone || 'ไม่มีเบอร์'})
+                      </option>
+                    ))}
+                  <option disabled className="text-slate-400">───── ฝ่ายอื่น / สำนักงานเขต ─────</option>
+                  {/* กลุ่มที่ 2: ฝ่ายอื่น */}
+                  {drivers
+                    .filter((d) => d.driver_dept_type === 'other')
+                    .map((item) => (
+                      <option key={item.id} value={item.id}>
+                        {(item.nickname ? item.nickname + ' - ' : '') + item.full_name} ({item.phone || 'ไม่มีเบอร์'})
+                      </option>
+                    ))}
                 </select>
               ) : (
                 <input
