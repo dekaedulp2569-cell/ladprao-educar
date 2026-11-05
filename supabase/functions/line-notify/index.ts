@@ -15,6 +15,23 @@ type Payload = {
   request?: { id?: string }
 }
 
+/** เพิ่ม LINE User ID ของผู้ที่เกี่ยวข้องในคำขอเข้า targets */
+function addRelatedRecipients(
+  request: { related_line_user_ids?: unknown },
+  targets: Map<string, string>,
+  missingRecipients: string[],
+) {
+  if (!Array.isArray(request.related_line_user_ids)) return
+  for (const lineId of request.related_line_user_ids) {
+    if (typeof lineId !== 'string' || !lineId.trim()) continue
+    if (isValidLineId(lineId)) {
+      if (!targets.has(lineId)) targets.set(lineId, 'ผู้เกี่ยวข้อง')
+    } else {
+      missingRecipients.push(`ผู้ที่เกี่ยวข้อง (${lineId}) ยังไม่ได้เชื่อม LINE`)
+    }
+  }
+}
+
 function statusFlex(request: CarRequestPayload, statusLabel: string, assignment?: {
   carLabel?: string
   driverName?: string
@@ -248,6 +265,7 @@ Deno.serve(async (req) => {
           driverPhone: driver?.phone,
         }
       : undefined
+    addRelatedRecipients(request, targets, missingRecipients)
     const reminder = statusFlex(
       request as CarRequestPayload,
       `${STATUS_LABEL[String(request.status || '')] || 'อัปเดตสถานะ'} • แจ้งซ้ำ`,
@@ -326,6 +344,7 @@ Deno.serve(async (req) => {
       missingRecipients.push('ผู้ขอใช้รถ (ยังไม่ได้เชื่อม LINE: ให้ผู้ขอเปิดเว็บแล้วกด "เข้าสู่ระบบด้วย LINE")')
     }
 
+    addRelatedRecipients(request, targets, missingRecipients)
     const notifications = await Promise.all(
       [...targets].map(async ([recipient, label]) => ({
         target: label,
@@ -366,6 +385,7 @@ Deno.serve(async (req) => {
       missingRecipients.push('ผู้ขอ (ไม่พบการเชื่อมบัญชี)')
     }
 
+    addRelatedRecipients(request, targets, missingRecipients)
     const notifications = await Promise.all(
       [...targets].map(async ([recipient, target]) => ({
         target,
@@ -415,10 +435,29 @@ Deno.serve(async (req) => {
     }
   }
 
-  const result = await pushFlex(
-    requester.line_user_id,
-    request.status === 'approved' ? 'คำขอใช้รถได้รับการอนุมัติแล้ว' : 'อัปเดตสถานะคำขอใช้รถ',
-    statusFlex(requestData, statusLabel, assignment),
+  const targets = new Map<string, string>([[requester.line_user_id, 'ผู้ขอ']])
+  const missingRecipients: string[] = []
+  addRelatedRecipients(request, targets, missingRecipients)
+
+  const notifications = await Promise.all(
+    [...targets].map(async ([recipient, target]) => ({
+      target,
+      result: await pushFlex(
+        recipient,
+        request.status === 'approved' ? 'คำขอใช้รถได้รับการอนุมัติแล้ว' : 'อัปเดตสถานะคำขอใช้รถ',
+        statusFlex(requestData, statusLabel, assignment),
+      ),
+    })),
   )
-  return json({ target: 'requester_private', result }, result.ok ? 200 : 502)
+  const failed = notifications.length === 0 || notifications.every(({ result }) => !result.ok)
+  return json(
+    {
+      ok: !failed,
+      target: 'requester_private',
+      result: notifications[0]?.result,
+      notifications,
+      missingRecipients,
+    },
+    failed ? 502 : 200,
+  )
 })

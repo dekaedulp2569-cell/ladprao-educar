@@ -19,6 +19,7 @@ import {
 import { PROVINCES } from '../lib/provinces'
 import { Alert, Card, EmptyState, Modal, SectionTitle, Spinner, StatusBadge } from './ui'
 import { OfficialCarFormModal } from './OfficialCarFormModal'
+import { RelatedPeoplePicker } from './RelatedPeoplePicker'
 import { MembersPanel } from './MembersPanel'
 import { openForm3PrintWindow } from '../lib/printForm3'
 
@@ -173,6 +174,9 @@ export function AdminDashboard() {
       passenger_count: Number(values.passenger_count),
       purpose: values.purpose.trim() || null,
       is_public_holiday: Boolean(values.is_public_holiday),
+      related_line_user_ids: Array.isArray(values.related_line_user_ids)
+        ? values.related_line_user_ids
+        : [],
     }
     const saved = await updateRequest(request.id, patch)
     if (!saved) return
@@ -682,6 +686,9 @@ function RequestEditModal({ request, busy, onClose, onSave }) {
     passenger_count: request.passenger_count || 1,
     purpose: request.purpose || '',
     is_public_holiday: Boolean(request.is_public_holiday),
+    related_line_user_ids: Array.isArray(request.related_line_user_ids)
+      ? request.related_line_user_ids
+      : [],
   }))
   const [validationError, setValidationError] = useState('')
 
@@ -787,6 +794,14 @@ function RequestEditModal({ request, busy, onClose, onSave }) {
             วัตถุประสงค์
             <textarea value={values.purpose} onChange={(event) => update('purpose', event.target.value)} rows="3" className={selectClass} />
           </label>
+        </div>
+
+        <div className="rounded-xl border border-slate-200 p-3">
+          <p className="mb-2 text-xs font-semibold text-slate-700">ผู้ที่เกี่ยวข้อง (รับแจ้งเตือน LINE)</p>
+          <RelatedPeoplePicker
+            value={values.related_line_user_ids}
+            onChange={(next) => update('related_line_user_ids', next)}
+          />
         </div>
 
         <div className="flex flex-col-reverse gap-2 border-t border-slate-100 pt-4 sm:flex-row sm:justify-end">

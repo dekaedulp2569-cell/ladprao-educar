@@ -161,10 +161,12 @@ Deno.serve(async (req) => {
         error: errorCode,
         description: errorDescription,
       })
+      const tokenExpired = /expired/i.test(errorDescription)
       return json(
         {
-          error:
-            'LINE ปฏิเสธ ID token กรุณาตรวจว่า LINE_LOGIN_CHANNEL_ID ตรงกับ Channel ID ของ LIFF และเปิด scope openid แล้วเริ่ม Login ใหม่',
+          error: tokenExpired
+            ? 'เซสชัน LINE หมดอายุแล้ว กรุณากด "เข้าสู่ระบบด้วย LINE" อีกครั้ง'
+            : 'LINE ปฏิเสธ ID token กรุณาตรวจว่า LINE_LOGIN_CHANNEL_ID ตรงกับ Channel ID ของ LIFF และเปิด scope openid แล้วเริ่ม Login ใหม่',
         },
         401,
         corsHeaders,

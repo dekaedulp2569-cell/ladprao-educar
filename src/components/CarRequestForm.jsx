@@ -17,6 +17,7 @@ import {
 } from '../lib/helpers'
 import { Alert, Card, SectionTitle } from './ui'
 import { OfficialCarFormModal } from './OfficialCarFormModal'
+import { RelatedPeoplePicker } from './RelatedPeoplePicker'
 import { openForm3PrintWindow } from '../lib/printForm3'
 
 const emptyForm = {
@@ -34,6 +35,7 @@ const emptyForm = {
   passenger_count: 1,
   purpose: '',
   is_public_holiday: false,
+  related_line_user_ids: [],
 }
 
 export function CarRequestForm({ onSubmitted }) {
@@ -154,6 +156,7 @@ export function CarRequestForm({ onSubmitted }) {
       approval_type: special ? 'district_director' : 'head_of_dept',
       status: special ? 'tentative' : 'pending',
       director_approval_status: special ? 'pending' : 'not_required',
+      related_line_user_ids: form.related_line_user_ids,
     }
 
     const { data, error } = await supabase
@@ -177,6 +180,7 @@ export function CarRequestForm({ onSubmitted }) {
       requester_position: current.requester_position,
       requester_department: current.requester_department,
       phone: current.phone,
+      related_line_user_ids: [],
     }))
 
     // บันทึกคำขอก่อน แล้วรายงานผลการส่ง LINE แยกจากผลการบันทึก
@@ -509,6 +513,17 @@ export function CarRequestForm({ onSubmitted }) {
               />
             </Field>
           </div>
+        </Card>
+
+        <Card className="p-5 sm:p-6">
+          <h3 className="mb-4 flex items-center gap-2 text-sm font-semibold text-brand-800">
+            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-brand-100 text-xs">4</span>
+            ผู้ที่เกี่ยวข้อง (รับแจ้งเตือน LINE)
+          </h3>
+          <RelatedPeoplePicker
+            value={form.related_line_user_ids}
+            onChange={(next) => update('related_line_user_ids', next)}
+          />
         </Card>
 
         <Card className={`border-2 p-5 sm:p-6 ${special ? 'border-amber-200 bg-amber-50/40' : 'border-brand-200 bg-brand-50/40'}`}>
