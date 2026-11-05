@@ -50,7 +50,7 @@ function summaryContents(title: string, lines: string[], color: string) {
               type: 'text',
               text: 'EduLP Car • สรุปงานประจำวัน (16:00 น.)',
               color: '#D1FAE5',
-              size: 'xs',
+              size: 'sm',
               weight: 'bold',
               wrap: true,
             },
@@ -65,7 +65,7 @@ function summaryContents(title: string, lines: string[], color: string) {
             ? chunk.map((line) => ({
                 type: 'text',
                 text: line,
-                size: 'xs',
+                size: 'sm',
                 color: '#374151',
                 wrap: true,
               }))
@@ -73,7 +73,7 @@ function summaryContents(title: string, lines: string[], color: string) {
                 {
                   type: 'text',
                   text: 'ไม่มีรายการที่ได้รับอนุมัติสำหรับวันพรุ่งนี้',
-                  size: 'sm',
+                  size: 'md',
                   color: '#4B5563',
                   wrap: true,
                 },

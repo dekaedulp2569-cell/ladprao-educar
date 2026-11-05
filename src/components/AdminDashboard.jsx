@@ -879,6 +879,15 @@ function RequestDetail({
     if (saved) onClose()
   }
 
+  const handleApprove = async () => {
+    // บันทึกการจัดสรรรถและคนขับก่อนอนุมัติ หากมีการเลือกไว้แล้ว
+    if (canManageAllocation) {
+      const saved = await onSaveAllocation(request, allocation)
+      if (!saved) return
+    }
+    await onApprove(request)
+  }
+
   return (
     <Modal open={Boolean(request)} onClose={onClose} title="รายละเอียดคำขอใช้รถ" size="lg">
       <div className="space-y-5">
@@ -1052,7 +1061,7 @@ function RequestDetail({
           <div className="flex flex-col gap-2 border-t border-slate-200 pt-4 sm:flex-row">
             <button
               type="button"
-              onClick={() => onApprove(request)}
+              onClick={handleApprove}
               disabled={busy}
               className="flex-1 rounded-xl bg-brand-700 px-4 py-3 text-sm font-semibold text-white transition hover:bg-brand-800 disabled:opacity-60"
             >

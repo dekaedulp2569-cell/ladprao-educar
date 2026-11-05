@@ -98,7 +98,7 @@ function driverFlex(request: CarRequestPayload, carLabel: string, driverName: st
       type: 'box',
       layout: 'vertical',
       contents: [
-        { type: 'text', text: 'EduLP Car • ใบสั่งงาน', color: '#FEF3C7', size: 'xs', weight: 'bold' },
+        { type: 'text', text: 'EduLP Car • ใบสั่งงาน', color: '#FEF3C7', size: 'sm', weight: 'bold' },
         { type: 'text', text: 'คุณมีคิววิ่งรถใหม่', color: '#FFFFFF', size: 'md', weight: 'bold', wrap: true },
       ],
     },
@@ -107,11 +107,11 @@ function driverFlex(request: CarRequestPayload, carLabel: string, driverName: st
       layout: 'vertical',
       spacing: 'sm',
       contents: [
-        { type: 'text', text: `วันเวลา: ${formatThaiDateTimeRange(request.start_datetime, request.end_datetime)}`, size: 'sm', weight: 'bold', wrap: true },
-        { type: 'text', text: `รถ: ${carLabel}`, size: 'sm', wrap: true },
-        { type: 'text', text: `ปลายทาง: ${request.destination || '-'} (${request.destination_province || '-'})`, size: 'sm', wrap: true },
-        { type: 'text', text: `ผู้ติดต่อ: ${request.requester_name || '-'}${request.phone ? ` (${request.phone})` : ''}`, size: 'sm', color: '#2563EB', weight: 'bold', wrap: true },
-        { type: 'text', text: `พนักงานขับรถ: ${driverName}`, size: 'xs', color: '#4B5563', wrap: true },
+        { type: 'text', text: `วันเวลา: ${formatThaiDateTimeRange(request.start_datetime, request.end_datetime)}`, size: 'md', weight: 'bold', wrap: true },
+        { type: 'text', text: `รถ: ${carLabel}`, size: 'md', wrap: true },
+        { type: 'text', text: `ปลายทาง: ${request.destination || '-'} (${request.destination_province || '-'})`, size: 'md', wrap: true },
+        { type: 'text', text: `ผู้ติดต่อ: ${request.requester_name || '-'}${request.phone ? ` (${request.phone})` : ''}`, size: 'md', color: '#2563EB', weight: 'bold', wrap: true },
+        { type: 'text', text: `พนักงานขับรถ: ${driverName}`, size: 'sm', color: '#4B5563', wrap: true },
       ],
     },
   }
@@ -194,23 +194,24 @@ Deno.serve(async (req) => {
     const carLabel = request.external_car_info ||
       (car ? `${car.license_plate} (${carTypeLabel(car.car_type)})` : 'ไม่ระบุรถ')
     const requestData = request as CarRequestPayload
-    const destination =
-      driver?.dept === 'education' && driver?.line_user_id && isValidLineId(driver.line_user_id)
-        ? driver.line_user_id
-        : lineGroupId
 
-    if (!destination) {
+    // ส่งใบสั่งงานเฉพาะพนักงานขับรถคนนั้นเท่านั้น (ไม่ส่งเข้ากลุ่ม)
+    const driverLineId = driver?.line_user_id && isValidLineId(driver.line_user_id)
+      ? driver.line_user_id
+      : (request.external_driver_name ? '' : '')
+
+    if (!driverLineId) {
       return json({
         ok: false,
-        error: `คนขับรถ (${driver?.full_name || request.external_driver_name || 'คนขับ'}) ยังไม่ได้เชื่อม LINE และยังไม่ได้ตั้งค่ากลุ่ม LINE (วิธีเชื่อม: ให้คนขับเปิดเว็บแล้วกด 'เข้าสู่ระบบด้วย LINE' หรือให้แอดมินนำ LINE User ID มากรอกในเมนูบุคลากร)`,
+        error: `คนขับรถ (${driver?.full_name || request.external_driver_name || 'คนขับ'}) ยังไม่ได้เชื่อม LINE กรุณาให้คนขับเปิดเว็บแล้วกด 'เข้าสู่ระบบด้วย LINE' หรือให้แอดมินนำ LINE User ID มากรอกในเมนูบุคลากร`,
       }, 422)
     }
     const result = await pushFlex(
-      destination,
+      driverLineId,
       'ใบสั่งงานพนักงานขับรถ',
       driverFlex(requestData, carLabel, driver?.full_name || request.external_driver_name || 'พนักงานขับรถ'),
     )
-    return json({ target: destination === lineGroupId ? 'group' : 'driver_private', result }, result.ok ? 200 : 502)
+    return json({ target: 'driver_private', result }, result.ok ? 200 : 502)
   }
 
   const canManageRequest =

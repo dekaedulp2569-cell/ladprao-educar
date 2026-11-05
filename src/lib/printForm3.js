@@ -271,7 +271,7 @@ export function generateForm3Html(request, car, driver, recipient) {
     }
 
     .approval-order {
-      margin: 24mm 0 0;
+      margin: 14mm 0 0;
       text-align: center;
       font-weight: 700;
     }

@@ -59,7 +59,7 @@ function reminderFlex(
     {
       type: 'text',
       text: `เหลืออีกประมาณ ${minutesLeft} นาทีถึงเวลาเดินทาง`,
-      size: 'sm',
+      size: 'md',
       weight: 'bold',
       color: meta.color,
       wrap: true,
@@ -67,7 +67,7 @@ function reminderFlex(
     {
       type: 'text',
       text: missionText,
-      size: 'sm',
+      size: 'md',
       wrap: true,
     },
   ]
@@ -83,7 +83,7 @@ function reminderFlex(
           type: 'text',
           text: 'EduLP Car • แจ้งเตือนก่อนเดินทาง',
           color: '#FEF3C7',
-          size: 'xs',
+          size: 'sm',
           weight: 'bold',
         },
         { type: 'text', text: meta.title, color: '#FFFFFF', size: 'md', weight: 'bold', wrap: true },
