@@ -309,54 +309,43 @@ export function AdminDashboard() {
     }
   }
 
-  const saveAllocation = async (request, allocation) => {
-    if (!isAdmin) {
-      setError('เฉพาะผู้ดูแลระบบเท่านั้นที่จัดสรรรถและพนักงานขับรถได้')
-      return false
-    }
-
-    const internalCar = allocation.carMode === 'internal' ? allocation.carId || null : null
-    const internalDriver = allocation.driverMode === 'internal' ? allocation.driverId || null : null
-
-    if (internalCar) {
-      const conflict = requests.find(
-        (item) =>
-          item.id !== request.id &&
-          item.status === 'approved' &&
-          item.assigned_car_id === internalCar &&
-          overlaps(request.start_datetime, request.end_datetime, item.start_datetime, item.end_datetime),
-      )
-      if (conflict) {
-        const proceed = window.confirm(
-          `รถคันนี้ถูกใช้ในรายการ ${conflict.doc_number} ในช่วงเวลาเดียวกัน\nต้องการบันทึกทับซ้อนหรือไม่`,
-        )
-        if (!proceed) return false
-      }
-    }
-
-    const saved = await updateRequest(request.id, {
-      assigned_car_id: internalCar,
-      external_car_info: allocation.carMode === 'external' ? allocation.externalCar.trim() || null : null,
-      assigned_driver_id: internalDriver,
-      external_driver_name:
-        allocation.driverMode === 'external' ? allocation.externalDriver.trim() || null : null,
-    })
-
-    if (saved) {
-      const updated = {
-        ...request,
-        assigned_car_id: internalCar,
-        external_car_info: allocation.carMode === 'external' ? allocation.externalCar.trim() : null,
-        assigned_driver_id: internalDriver,
-        external_driver_name:
-          allocation.driverMode === 'external' ? allocation.externalDriver.trim() : null,
-      }
-
-      if (request.status === 'approved') notifyAssignedDriver(updated)
-    }
-
-    return saved
+const saveAllocation = async (request, allocation) => {
+  if (!isAdmin) {
+    setError('เฉพาะผู้ดูแลระบบเท่านั้นที่จัดสรรรถและพนักงานขับรถได้')
+    return false
   }
+
+  const internalCar = allocation.carMode === 'internal' ? allocation.carId || null : null
+  const internalDriver = allocation.driverMode === 'internal' ? allocation.driverId || null : null
+
+  // ตรวจสอบการชนของรถ
+  if (internalCar) {
+    const conflict = requests.find(
+      (item) =>
+        item.id !== request.id &&
+        item.status === 'approved' &&
+        item.assigned_car_id === internalCar &&
+        overlaps(request.start_datetime, item.start_datetime, item.end_datetime, item.end_datetime),
+    )
+    if (conflict) {
+      const proceed = window.confirm(
+        `รถคันนี้ถูกใช้ในรายการ ${conflict.doc_number} ในช่วงเวลาเดียวกัน\nต้องการบันทึกทับซ้อนหรือไม่`,
+      )
+      if (!proceed) return false
+    }
+  }
+
+  // อัปเดตเฉพาะฟิลด์จัดสรร (ไม่แตะ status)
+  const saved = await updateRequest(request.id, {
+    assigned_car_id: internalCar,
+    external_car_info: allocation.carMode === 'external' ? allocation.externalCar.trim() || null : null,
+    assigned_driver_id: internalDriver,
+    external_driver_name:
+      allocation.driverMode === 'external' ? allocation.externalDriver.trim() || null : null,
+  })
+
+  return saved
+}
 
   const sendDailySummary = async () => {
     setSummaryBusy(true)
@@ -880,14 +869,19 @@ function RequestDetail({
     if (saved) onClose()
   }
 
-  const handleApprove = async () => {
-    // บันทึกการจัดสรรรถและคนขับก่อนอนุมัติ หากมีการเลือกไว้แล้ว
-    if (canManageAllocation) {
-      const saved = await onSaveAllocation(request, allocation)
-      if (!saved) return
-    }
-    await onApprove(request)
+const handleApprove = async () => {
+  // ขั้นตอนที่ 1: อนุมัติสถานะก่อน (เปลี่ยนแค่ status เดียว ไม่แตะรถ/คนขับ)
+  const approved = await updateRequest(request.id, { 
+    status: 'approved',
+    director_approval_status: request.status === 'tentative' ? 'approved' : request.director_approval_status
+  })
+  if (!approved) return
+
+  // ขั้นตอนที่ 2: ถ้ามีการเลือกรถ/คนขับไว้ ให้จัดสรรทีหลัง (อัปเดตเฉพาะ allocation)
+  if (canManageAllocation && (allocation.carId || allocation.driverId || allocation.externalCar || allocation.externalDriver)) {
+    await onSaveAllocation(request, allocation)
   }
+}
 
   return (
     <Modal open={Boolean(request)} onClose={onClose} title="รายละเอียดคำขอใช้รถ" size="lg">
