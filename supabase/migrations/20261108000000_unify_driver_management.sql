@@ -1,14 +1,17 @@
 -- ==========================================
--- รวมจัดการคนขับเข้ากับ user_profiles
+-- รวมจัดการคนขับเข้ากับ user_profiles (Single Source of Truth)
 -- ==========================================
 
 -- 1. เพิ่มฟิลด์ใหม่ใน user_profiles (ถ้ายังไม่มี)
 ALTER TABLE public.user_profiles
   ADD COLUMN IF NOT EXISTS nickname TEXT,
+  ADD COLUMN IF NOT EXISTS phone TEXT,
+  ADD COLUMN IF NOT EXISTS line_user_id TEXT UNIQUE,
+  ADD COLUMN IF NOT EXISTS role TEXT DEFAULT 'requester' CHECK (role IN ('admin', 'head_of_dept', 'driver', 'requester')),
   ADD COLUMN IF NOT EXISTS driver_dept_type TEXT CHECK (driver_dept_type IN ('education', 'other')),
   ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'active' CHECK (status IN ('active', 'inactive'));
 
--- 2. ย้ายข้อมูลคนขับจากตาราง drivers (ถ้ามี) มาไว้ใน user_profiles
+-- 2. ย้ายข้อมูลคนขับจากตาราง drivers เก่า (ถ้ายังมี) มาไว้ใน user_profiles
 DO $$
 BEGIN
   IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'drivers') THEN

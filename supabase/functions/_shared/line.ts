@@ -213,21 +213,22 @@ export const STATUS_LABEL: Record<string, string> = {
   cancelled: 'ยกเลิกคำขอใช้รถ',
 }
 
-// สีสถานะกลาง ใช้ให้ตรงกับเว็บแอป (ฟ้า/ส้ม/เขียว/แดง/เทา)
+// สีสถานะกลาง แยกตามประเภทข่าวสาร (Color-Coded Status System)
+// 🟡 เหลือง-ส้ม: Pending / New Request | 🟢 เขียว: Approved | 🔵 ฟ้า: Summary | 🔴 แดง: Reminder/Cancelled
 export const STATUS_COLOR: Record<string, string> = {
-  pending: '#0284C7',
+  pending: '#D97706',
   tentative: '#D97706',
   approved: '#059669',
-  rejected: '#E11D48',
-  cancelled: '#475569',
+  rejected: '#DC2626',
+  cancelled: '#DC2626',
 }
 
 export const STATUS_EMOJI: Record<string, string> = {
-  pending: '🔵',
+  pending: '🟡',
   tentative: '🟠',
   approved: '🟢',
   rejected: '🔴',
-  cancelled: '⚫',
+  cancelled: '🔴',
 }
 
 export function statusColor(status?: string | null) {

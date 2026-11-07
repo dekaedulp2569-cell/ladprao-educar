@@ -17,11 +17,16 @@ import {
   pushFlex,
 } from '../_shared/line.ts'
 
-const LOOK_AHEAD_MINUTES = 36
+const LOOK_AHEAD_MINUTES = 70
 
 const REMINDER_META = {
+  driver_60: {
+    color: '#DC2626',
+    title: 'อีก 1 ชั่วโมงถึงเวลาเดินทาง',
+    alt: 'แจ้งเตือนคนขับ: อีก 1 ชั่วโมงถึงเวลาเดินทาง',
+  },
   driver_30: {
-    color: '#D97706',
+    color: '#DC2626',
     title: 'อีก 30 นาทีถึงเวลาเดินทาง',
     alt: 'แจ้งเตือนคนขับ: อีก 30 นาทีถึงเวลาเดินทาง',
   },
@@ -31,7 +36,7 @@ const REMINDER_META = {
     alt: 'แจ้งเตือนคนขับ: อีก 10 นาทีถึงเวลาเดินทาง',
   },
   related_10: {
-    color: '#2563EB',
+    color: '#DC2626',
     title: 'อีก 10 นาทีรถจะออกเดินทาง',
     alt: 'แจ้งเตือนผู้เกี่ยวข้อง: อีก 10 นาทีรถจะออกเดินทาง',
   },
@@ -46,7 +51,7 @@ function reminderFlex(
   driverLabel: string,
 ) {
   const meta = REMINDER_META[type]
-  const minutesLeft = type === 'driver_30' ? 30 : 10
+  const minutesLeft = type === 'driver_60' ? 60 : type === 'driver_30' ? 30 : 10
 
   const missionText = buildMissionText({
     index: 1,
@@ -186,7 +191,7 @@ Deno.serve(async (req) => {
   const [{ data: cars, error: carsError }, { data: drivers, error: driversError }] =
     await Promise.all([
       supabase.from('cars').select('*'),
-      supabase.from('drivers').select('*'),
+      supabase.from('user_profiles').select('*').eq('role', 'driver'),
     ])
   if (carsError || driversError) {
     return json({ error: 'Unable to load vehicle and driver details' }, 500)
@@ -209,6 +214,20 @@ Deno.serve(async (req) => {
       : job.external_car_info || 'ไม่ระบุรถ'
     const driverLabel = driver?.full_name || job.external_driver_name || 'ยังไม่ระบุคนขับ'
     const driverLineId = isValidLineId(driver?.line_user_id) ? driver!.line_user_id : ''
+
+    if (minutesUntil <= 60 && driverLineId) {
+      results.push({
+        request: job.id,
+        type: 'driver_60',
+        result: await sendOnce(
+          supabase,
+          job.id,
+          'driver_60',
+          driverLineId,
+          reminderFlex(job, 'driver_60', carLabel, driverLabel),
+        ),
+      })
+    }
 
     if (minutesUntil <= 30 && driverLineId) {
       results.push({

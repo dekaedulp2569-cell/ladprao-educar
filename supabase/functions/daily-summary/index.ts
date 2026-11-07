@@ -21,7 +21,7 @@ import {
 } from '../_shared/line.ts'
 
 const BANGKOK_OFFSET_MINUTES = 7 * 60
-const SUMMARY_COLOR = '#047857'
+const SUMMARY_COLOR = '#0284C7'
 
 function bangkokDateKey(date: Date) {
   const local = new Date(date.getTime() + BANGKOK_OFFSET_MINUTES * 60 * 1000)
@@ -151,7 +151,7 @@ Deno.serve(async (req) => {
   const [{ data: cars, error: carsError }, { data: drivers, error: driversError }] =
     await Promise.all([
       supabase.from('cars').select('*'),
-      supabase.from('drivers').select('*'),
+      supabase.from('user_profiles').select('*').eq('role', 'driver'),
     ])
   if (carsError || driversError) {
     return json({ error: 'Unable to load vehicle and driver details' }, 500)

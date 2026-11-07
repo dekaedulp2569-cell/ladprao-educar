@@ -204,23 +204,6 @@ export function AdminDashboard() {
       return
     }
 
-    const conflict = request.assigned_car_id
-      ? requests.find(
-          (item) =>
-            item.id !== request.id &&
-            item.status === 'approved' &&
-            item.assigned_car_id === request.assigned_car_id &&
-            overlaps(request.start_datetime, request.end_datetime, item.start_datetime, item.end_datetime),
-        )
-      : null
-
-    if (conflict) {
-      const proceed = window.confirm(
-        `รถคันนี้ถูกใช้ในรายการ ${conflict.doc_number} ในช่วงเวลาเดียวกัน\nต้องการอนุมัติทับซ้อนหรือไม่`,
-      )
-      if (!proceed) return
-    }
-
     if (request.status === 'tentative') {
       const ok = window.confirm(
         'ยืนยันว่า ผอ.เขตลาดพร้าว ลงนามอนุมัติหนังสือฉบับจริงแล้ว และต้องการเปลี่ยนสถานะเป็นอนุมัติ 100% หรือไม่',
@@ -238,13 +221,12 @@ export function AdminDashboard() {
           statusLabel: 'อนุมัติแล้ว (ล็อกคิว)',
           text: buildStatusMessage(approved, 'อนุมัติแล้ว (ล็อกคิว)'),
         })
-        notifyAssignedDriver(request)
       }
       return
     }
 
     if (request.status === 'pending') {
-      const ok = window.confirm('ยืนยันการอนุมัติคำขอนี้ และล็อกคิวรถหรือไม่')
+      const ok = window.confirm('ยืนยันการอนุมัติคำขอนี้ หรือไม่')
       if (!ok) return
       const saved = await updateRequest(request.id, { status: 'approved' })
       if (saved) {
@@ -255,7 +237,6 @@ export function AdminDashboard() {
           statusLabel: 'อนุมัติแล้ว (ล็อกคิว)',
           text: buildStatusMessage(approved, 'อนุมัติแล้ว (ล็อกคิว)'),
         })
-        notifyAssignedDriver(request)
       }
     }
   }

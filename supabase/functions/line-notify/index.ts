@@ -237,8 +237,9 @@ Deno.serve(async (req) => {
           : Promise.resolve({ data: null, error: null }),
         request.assigned_driver_id
           ? admin
-              .from('drivers').select('full_name, line_user_id')
+              .from('user_profiles').select('full_name, nickname, phone, line_user_id, driver_dept_type')
               .eq('id', request.assigned_driver_id)
+              .eq('role', 'driver')
               .maybeSingle()
           : Promise.resolve({ data: null, error: null }),
         request.assigned_car_id
@@ -324,8 +325,10 @@ Deno.serve(async (req) => {
           : Promise.resolve({ data: null, error: null }),
         request.assigned_driver_id
           ? admin
-              .from('drivers').select('full_name, line_user_id')
+              .from('user_profiles')
+              .select('full_name, nickname, phone, line_user_id, driver_dept_type')
               .eq('id', request.assigned_driver_id)
+              .eq('role', 'driver')
               .maybeSingle()
           : Promise.resolve({ data: null, error: null }),
         request.assigned_car_id
@@ -380,10 +383,9 @@ Deno.serve(async (req) => {
   const requestData = request as CarRequestPayload
 
   if (request.status === 'pending' || request.status === 'tentative') {
+    // 🟡 ส่งเฉพาะ LINE ส่วนตัว Admin เท่านั้น (ห้ามส่งเข้ากลุ่ม LINE)
     const targets = new Map<string, string>()
     const missingRecipients: string[] = []
-    if (lineGroupId) targets.set(lineGroupId, 'กลุ่มฝ่ายการศึกษา')
-    else missingRecipients.push('กลุ่มฝ่ายการศึกษา (ไม่ได้ตั้งค่า LINE_GROUP_ID)')
 
     if (request.requester_auth_user_id) {
       const { data: requester, error: requesterError } = await admin
@@ -436,7 +438,12 @@ Deno.serve(async (req) => {
         ? admin.from('cars').select('license_plate, car_type').eq('id', request.assigned_car_id).maybeSingle()
         : Promise.resolve({ data: null, error: null }),
       request.assigned_driver_id
-        ? admin.from('drivers').select('full_name').eq('id', request.assigned_driver_id).maybeSingle()
+        ? admin
+            .from('user_profiles')
+            .select('full_name, nickname, phone, driver_dept_type')
+            .eq('id', request.assigned_driver_id)
+            .eq('role', 'driver')
+            .maybeSingle()
         : Promise.resolve({ data: null, error: null }),
     ])
     if (carError || driverError) return json({ error: 'Unable to load assignment details' }, 500)

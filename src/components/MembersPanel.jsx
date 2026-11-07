@@ -15,6 +15,11 @@ const DEPT_LABELS = {
   other: 'ฝ่ายอื่น / สำนักงานเขต',
 }
 
+const STATUS_LABELS = {
+  active: 'ใช้งาน',
+  inactive: 'ระงับการใช้งาน',
+}
+
 const emptyMemberForm = {
   full_name: '',
   nickname: '',
