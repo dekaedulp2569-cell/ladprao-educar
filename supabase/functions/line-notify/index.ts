@@ -40,6 +40,9 @@ function statusFlex(request: CarRequestPayload, statusLabel: string, assignment?
   driverName?: string
   driverPhone?: string
 }) {
+  const statusColorHex = statusColor(request.status)
+  const statusEmojiChar = statusEmoji(request.status)
+  
   const rows: Record<string, unknown>[] = [
     { type: 'text', text: `เลขที่เอกสาร: ${request.doc_number || '-'}`, size: 'xs', color: '#6B7280', wrap: true },
     { type: 'text', text: `ผู้ขอ: ${request.requester_name || '-'}`, size: 'sm', weight: 'bold', wrap: true },
@@ -50,10 +53,10 @@ function statusFlex(request: CarRequestPayload, statusLabel: string, assignment?
     { type: 'text', text: `ผู้อนุมัติ: ${request.approval_type === 'district_director' ? 'ผู้อำนวยการเขต' : 'หัวหน้าฝ่ายการศึกษา'}`, size: 'xs', color: '#4B5563', wrap: true },
     {
       type: 'text',
-      text: `สถานะ: ${statusEmoji(request.status)} ${statusLabel}`,
+      text: `สถานะ: ${statusEmojiChar} ${statusLabel}`,
       size: 'sm',
       weight: 'bold',
-      color: statusColor(request.status),
+      color: statusColorHex,
       wrap: true,
     },
   ]
@@ -70,7 +73,7 @@ function statusFlex(request: CarRequestPayload, statusLabel: string, assignment?
     type: 'bubble',
     styles: {
       header: {
-        backgroundColor: statusColor(request.status),
+        backgroundColor: statusColorHex,
       },
     },
     header: {
@@ -80,7 +83,7 @@ function statusFlex(request: CarRequestPayload, statusLabel: string, assignment?
         { type: 'text', text: 'EduLP Car • อัปเดตสถานะ', color: '#FEF3C7', size: 'xs', weight: 'bold' },
         {
           type: 'text',
-          text: `${statusEmoji(request.status)} ${statusLabel}`,
+          text: `${statusEmojiChar} ${statusLabel}`,
           color: '#FFFFFF',
           size: 'md',
           weight: 'bold',
@@ -95,13 +98,13 @@ function statusFlex(request: CarRequestPayload, statusLabel: string, assignment?
 function driverFlex(request: CarRequestPayload, carLabel: string, driverName: string) {
   return {
     type: 'bubble',
-    styles: { header: { backgroundColor: '#D97706' } },
+    styles: { header: { backgroundColor: '#059669' } },
     header: {
       type: 'box',
       layout: 'vertical',
       contents: [
-        { type: 'text', text: 'EduLP Car • ใบสั่งงาน', color: '#FEF3C7', size: 'sm', weight: 'bold' },
-        { type: 'text', text: 'คุณมีคิววิ่งรถใหม่', color: '#FFFFFF', size: 'md', weight: 'bold', wrap: true },
+        { type: 'text', text: 'EduLP Car • ใบสั่งงานปฏิบัติหน้าที่', color: '#D1FAE5', size: 'xs', weight: 'bold' },
+        { type: 'text', text: '✅ อนุมัติแล้ว - ใบสั่งงานขับรถ', color: '#FFFFFF', size: 'md', weight: 'bold', wrap: true },
       ],
     },
     body: {
@@ -109,12 +112,13 @@ function driverFlex(request: CarRequestPayload, carLabel: string, driverName: st
       layout: 'vertical',
       spacing: 'sm',
       contents: [
-        { type: 'text', text: `วันเวลา: ${formatThaiDateTimeRange(request.start_datetime, request.end_datetime)}`, size: 'md', weight: 'bold', wrap: true },
-        { type: 'text', text: `รถ: ${carLabel}`, size: 'md', wrap: true },
-        { type: 'text', text: `จุดรับ: ${request.pickup_location || '-'}`, size: 'md', wrap: true },
-        { type: 'text', text: `วัตถุประสงค์: ${request.purpose || '-'}`, size: 'md', wrap: true },
-        { type: 'text', text: `ปลายทาง: ${request.destination || '-'} (${request.destination_province || '-'})`, size: 'md', wrap: true },
-        { type: 'text', text: `ผู้ประสานงาน: ${request.passenger_name || '-'} ${request.passenger_phone ? `(${request.passenger_phone})` : ''}`, size: 'md', color: '#2563EB', weight: 'bold', wrap: true },
+        { type: 'text', text: `🗓️ กำหนดการ: ${formatThaiDateTimeRange(request.start_datetime, request.end_datetime)}`, size: 'sm', weight: 'bold', wrap: true },
+        { type: 'text', text: `🚘 รถที่ใช้: ${carLabel}`, size: 'sm', color: '#059669', weight: 'bold', wrap: true },
+        { type: 'separator', margin: 'xs' },
+        { type: 'text', text: `📍 จุดรับ (ต้นทาง): ${request.pickup_location || '-'}`, size: 'xs', color: '#4B5563', wrap: true },
+        { type: 'text', text: `🏁 ปลายทาง: ${request.destination || '-'} (${request.destination_province || '-'})`, size: 'xs', color: '#4B5563', wrap: true },
+        { type: 'text', text: `👤 ผู้ประสานงานหน้างาน: ${request.passenger_name || '-'}`, size: 'xs', color: '#1F2937', weight: 'bold', wrap: true },
+        { type: 'text', text: `📞 เบอร์โทรศัพท์: ${request.passenger_phone || '-'}`, size: 'sm', color: '#2563EB', weight: 'bold', wrap: true },
         { type: 'text', text: `พนักงานขับรถ: ${driverName}`, size: 'sm', color: '#4B5563', wrap: true },
       ],
     },
@@ -309,7 +313,7 @@ Deno.serve(async (req) => {
     }, allFailed ? 422 : 200)
   }
 
-  if (request.status === 'cancelled') {
+    if (request.status === 'cancelled') {
     if (profile.role !== 'admin' && request.requester_auth_user_id !== authData.user.id) {
       return json({ error: 'Only the requester or an admin can notify this cancellation' }, 403)
     }
