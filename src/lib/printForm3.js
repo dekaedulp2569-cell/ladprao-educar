@@ -22,7 +22,7 @@ function printable(value) {
  * ถ้ามี \n จะตัดตามบรรทัดที่ผู้ใช้เคาะไว้
  * ถ้าไม่มี จะพยายามตัดที่ช่องว่างใกล้เคียง maxLine1Chars
  */
-export function splitTextTwoLines(text, maxLine1Chars = 42) {
+export function splitTextTwoLines(text, maxLine1Chars = 55) {
   if (!text) return { line1: '', line2: '' }
   const raw = String(text).trim()
   if (raw.includes('\n')) {
@@ -72,17 +72,20 @@ export function generateForm3Html(request, car, driver, recipient) {
 
   const requesterName = printable(request.requester_name || '')
   const requesterPosition = printable(request.requester_position || '')
+  const requesterDepartment = printable(
+    request.requester_department || 'ฝ่ายการศึกษา สำนักงานเขตลาดพร้าว',
+  )
 
   const destFull = [
     request.destination || '',
     request.destination_province ? ` (${request.destination_province})` : '',
   ].join('').trim()
-  const destLines = splitTextTwoLines(toThaiDigits(destFull), 42)
+  const destLines = splitTextTwoLines(toThaiDigits(destFull), 56)
   const destLine1 = escapeHtml(destLines.line1)
   const destLine2 = escapeHtml(destLines.line2)
 
   const purposeFull = request.purpose || ''
-  const purposeLines = splitTextTwoLines(toThaiDigits(purposeFull), 54)
+  const purposeLines = splitTextTwoLines(toThaiDigits(purposeFull), 100)
   const purposeLine1 = escapeHtml(purposeLines.line1)
   const purposeLine2 = escapeHtml(purposeLines.line2)
 
@@ -95,6 +98,14 @@ export function generateForm3Html(request, car, driver, recipient) {
 
   const startDateStr = startsAt.day ? `${startsAt.day} ${startsAt.month} ${startsAt.year}` : ''
   const endDateStr = endsAt.day ? `${endsAt.day} ${endsAt.month} ${endsAt.year}` : ''
+
+  const formattedPosition = requesterPosition
+    ? (requesterPosition.startsWith('ตำแหน่ง') ? requesterPosition : `ตำแหน่ง ${requesterPosition}`)
+    : 'ตำแหน่ง............................................................'
+
+  const formattedDepartment = requesterDepartment
+    ? (requesterDepartment.startsWith('สังกัด') ? requesterDepartment : `สังกัด ${requesterDepartment}`)
+    : 'สังกัด............................................................'
 
   return `<!DOCTYPE html>
 <html lang="th">
@@ -195,7 +206,7 @@ export function generateForm3Html(request, car, driver, recipient) {
     }
 
     .a4-container {
-      padding: 24px 0 48px;
+      padding: 20px 0 40px;
       display: flex;
       justify-content: center;
     }
@@ -206,11 +217,11 @@ export function generateForm3Html(request, car, driver, recipient) {
       max-height: 297mm;
       background: #fff;
       margin: 0 auto;
-      padding: 18mm 20mm 16mm 25mm;
+      padding: 15mm 20mm 14mm 25mm;
       box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
       position: relative;
-      font-size: 16pt;
-      line-height: 1.45;
+      font-size: 15pt;
+      line-height: 1.4;
       overflow: hidden;
       break-after: avoid-page;
       page-break-after: avoid;
@@ -229,20 +240,25 @@ export function generateForm3Html(request, car, driver, recipient) {
       font-weight: 700;
       font-size: 20pt;
       line-height: 1.2;
-      margin: 0 0 4mm 0;
+      margin: 0 0 3mm 0;
     }
 
     .form-row {
       display: flex;
       align-items: baseline;
-      min-height: 7.2mm;
-      line-height: 1.45;
+      min-height: 6.8mm;
+      line-height: 1.4;
       margin: 0;
       position: relative;
     }
 
     .row-label {
       white-space: nowrap;
+      flex: none;
+    }
+
+    .invisible {
+      visibility: hidden;
       flex: none;
     }
 
@@ -266,7 +282,6 @@ export function generateForm3Html(request, car, driver, recipient) {
       display: inline-block;
       border-bottom: 1px dotted #000;
       height: 1em;
-      flex: none;
     }
 
     .indent-gov {
@@ -278,21 +293,44 @@ export function generateForm3Html(request, car, driver, recipient) {
       align-items: baseline;
       margin-left: 50%;
       margin-bottom: 2mm;
-      min-height: 7.2mm;
+      min-height: 6.8mm;
     }
 
     .requester-sig-block {
-      margin-top: 14mm;
+      margin-top: 5mm;
+      display: flex;
+      justify-content: flex-end;
+      width: 100%;
+    }
+
+    .sig-group {
+      display: inline-flex;
+      flex-direction: column;
+      align-items: center;
+      width: 88mm;
+      text-align: center;
+    }
+
+    .sig-line-row {
       display: flex;
       align-items: baseline;
       justify-content: flex-end;
       width: 100%;
     }
 
+    .sig-subtext {
+      margin-top: 1mm;
+      font-size: 14pt;
+      line-height: 1.25;
+      text-align: center;
+      width: 100%;
+      white-space: nowrap;
+    }
+
     .head-sig-block {
-      margin-top: 6mm;
-      margin-left: 48%;
-      width: 52%;
+      margin-top: 5mm;
+      margin-left: 45%;
+      width: 55%;
     }
 
     .head-sig-block .sig-row {
@@ -301,12 +339,36 @@ export function generateForm3Html(request, car, driver, recipient) {
       width: 100%;
     }
 
-    .sig-date-row {
-      margin-top: 16mm;
+    .head-sig-block .sig-date-row {
+      margin-top: 13mm;
+      display: flex;
+      align-items: baseline;
+      width: 100%;
+    }
+
+    .auth-sig-block {
+      margin-top: 5mm;
+      margin-left: 35%;
+      width: 65%;
+    }
+
+    .auth-sig-block .sig-row {
+      display: flex;
+      align-items: baseline;
+      width: 100%;
+    }
+
+    .auth-sig-block .sig-date-row {
+      margin-top: 13mm;
+      display: flex;
+      align-items: baseline;
+      width: 100%;
+    }
+
+    .date-under-line {
       display: flex;
       align-items: baseline;
       justify-content: center;
-      white-space: nowrap;
     }
 
     .date-slot {
@@ -317,22 +379,11 @@ export function generateForm3Html(request, car, driver, recipient) {
     }
 
     .order-block {
-      margin-top: 10mm;
+      margin-top: 5mm;
       text-align: center;
-      font-size: 16pt;
-      line-height: 1.4;
-    }
-
-    .auth-sig-block {
-      margin-top: 8mm;
-      margin-left: 38%;
-      width: 62%;
-    }
-
-    .auth-sig-block .sig-row {
-      display: flex;
-      align-items: baseline;
-      width: 100%;
+      font-size: 15.5pt;
+      line-height: 1.35;
+      font-weight: 700;
     }
 
     .text-center {
@@ -366,7 +417,7 @@ export function generateForm3Html(request, car, driver, recipient) {
         height: 297mm !important;
         max-height: 297mm !important;
         margin: 0 !important;
-        padding: 18mm 20mm 16mm 25mm !important;
+        padding: 15mm 20mm 14mm 25mm !important;
         box-shadow: none !important;
         border: none !important;
         break-after: avoid-page !important;
@@ -419,20 +470,20 @@ export function generateForm3Html(request, car, driver, recipient) {
 
       <div class="form-row">
         <span class="row-label">ขออนุญาตใช้รถ (ไปที่ไหน)</span>
-        <span class="dotted-fill text-left">${destLine1 || '&nbsp;'}</span>
+        <span class="dotted-fill text-left" style="font-size: ${destLine1.length > 48 ? '13.5pt' : '15pt'}; white-space: nowrap;">${destLine1 || '&nbsp;'}</span>
       </div>
 
       <div class="form-row">
-        <span class="dotted-fill text-left">${destLine2 || '&nbsp;'}</span>
+        <span class="dotted-fill text-left" style="white-space: nowrap;">${destLine2 || '&nbsp;'}</span>
       </div>
 
       <div class="form-row">
         <span class="row-label">เพื่อ</span>
-        <span class="dotted-fill text-left">${purposeLine1 || '&nbsp;'}</span>
+        <span class="dotted-fill text-left" style="font-size: ${purposeLine1.length > 70 ? '13.5pt' : '15pt'}; white-space: nowrap;">${purposeLine1 || '&nbsp;'}</span>
       </div>
 
       <div class="form-row">
-        <span class="dotted-fill text-left">${purposeLine2 || '&nbsp;'}</span>
+        <span class="dotted-fill text-left" style="white-space: nowrap;">${purposeLine2 || '&nbsp;'}</span>
         <span class="row-label" style="margin-left: 8px;">มีคนนั่ง</span>
         <span class="dotted-field text-center" style="width: 16mm;">${passengerCount || '&nbsp;'}</span>
         <span class="row-label" style="margin-left: 6px;">คน</span>
@@ -455,13 +506,28 @@ export function generateForm3Html(request, car, driver, recipient) {
       </div>
 
       <div class="requester-sig-block">
-        <span class="dotted-line" style="width: 60mm;">&nbsp;</span>
-        <span class="row-label" style="margin-left: 6px;">ผู้ขออนุญาต</span>
+        <div class="sig-group">
+          <div class="sig-line-row">
+            <span class="dotted-line" style="width: 58mm;">&nbsp;</span>
+            <span class="row-label" style="margin-left: 6px;">ผู้ขออนุญาต</span>
+          </div>
+          <div class="sig-subtext">
+            (&nbsp;${requesterName || '............................................................'}&nbsp;)
+          </div>
+          <div class="sig-subtext">
+            ${formattedPosition}
+          </div>
+          <div class="sig-subtext">
+            ${formattedDepartment}
+          </div>
+        </div>
       </div>
 
-      <div class="form-row" style="margin-top: 12mm;">
+      <div class="form-row" style="margin-top: 5mm;">
         <span class="row-label">รถยนต์</span>
-        <span class="dotted-field text-center" style="width: 36mm;">${carType || '-'}</span>
+        <span class="dotted-field text-center" style="width: 62mm; min-width: 62mm; font-size: ${carType.length > 20 ? '13.5pt' : '15pt'}; white-space: nowrap;">
+          ${carType || '-'}
+        </span>
         <span class="row-label" style="margin-left: 8px;">หมายเลขทะเบียน</span>
         <span class="dotted-fill text-center">${carPlate || '&nbsp;'}</span>
       </div>
@@ -478,10 +544,14 @@ export function generateForm3Html(request, car, driver, recipient) {
           <span class="row-label" style="margin-left: 4px;">หัวหน้าฝ่ายหรือผู้แทน</span>
         </div>
         <div class="sig-date-row">
-          <span class="date-slot">&nbsp;</span>/
-          <span class="date-slot">&nbsp;</span>/
-          <span class="date-slot">&nbsp;</span>
-          <span class="row-label" style="margin-left: 4px;">(วัน เดือน ปี)</span>
+          <span class="row-label invisible">ลงชื่อ</span>
+          <div class="date-under-line" style="flex: 1;">
+            <span class="date-slot">&nbsp;</span>/
+            <span class="date-slot">&nbsp;</span>/
+            <span class="date-slot">&nbsp;</span>
+            <span class="row-label" style="margin-left: 4px;">(วัน เดือน ปี)</span>
+          </div>
+          <span class="row-label invisible" style="margin-left: 4px;">หัวหน้าฝ่ายหรือผู้แทน</span>
         </div>
       </div>
 
@@ -495,10 +565,13 @@ export function generateForm3Html(request, car, driver, recipient) {
           <span class="dotted-line" style="flex: 1;">&nbsp;</span>
         </div>
         <div class="sig-date-row">
-          <span class="date-slot">&nbsp;</span>/
-          <span class="date-slot">&nbsp;</span>/
-          <span class="date-slot">&nbsp;</span>
-          <span class="row-label" style="margin-left: 4px;">(วัน เดือน ปี)</span>
+          <span class="row-label invisible">(ลงนามผู้มีอำนาจสั่งใช้รถ)</span>
+          <div class="date-under-line" style="flex: 1;">
+            <span class="date-slot">&nbsp;</span>/
+            <span class="date-slot">&nbsp;</span>/
+            <span class="date-slot">&nbsp;</span>
+            <span class="row-label" style="margin-left: 4px;">(วัน เดือน ปี)</span>
+          </div>
         </div>
       </div>
     </main>
