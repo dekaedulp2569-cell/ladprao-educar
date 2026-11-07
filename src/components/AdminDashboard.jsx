@@ -131,6 +131,22 @@ export function AdminDashboard() {
     void notifyLine({ type: 'driver_assigned', request })
   }
 
+  /**
+   * 🟠/🟢 ส่งใบสั่งงานส่วนตัวคนขับตามสถานะปัจจุบันของคำขอ (เรียกหลังบันทึกการจัดสรร และหลังอนุมัติ)
+   * คืนค่า: { result: 'skipped' | true | 'error', detail?: string }
+   */
+  const sendDriverMissionNotice = async (request) => {
+    if (!isAdmin) return { result: 'skipped' }
+    if (!request.assigned_driver_id && !request.external_driver_name) return { result: 'skipped' }
+    const notification = await notifyLine({
+      type: 'driver_assigned',
+      request: { id: request.id },
+    })
+    if (notification?.result?.ok === true) return { result: true }
+    const detail = notification?.reason || notification?.error || 'ส่งใบสั่งงานไม่สำเร็จ'
+    return { result: 'error', detail }
+  }
+
   const notifyRequestParties = async (request, successMessage = 'ส่งข้อความ LINE ให้ผู้เกี่ยวข้องแล้ว') => {
     setError('')
     setNotice('')
@@ -201,14 +217,14 @@ export function AdminDashboard() {
       (isHeadOfDept && request.approval_type === 'head_of_dept' && request.status === 'pending')
     if (!canApprove) {
       setError('บัญชีนี้ไม่มีสิทธิ์อนุมัติคำขอนี้')
-      return
+      return { saved: false, mission: 'skipped' }
     }
 
     if (request.status === 'tentative') {
       const ok = window.confirm(
         'ยืนยันว่า ผอ.เขตลาดพร้าว ลงนามอนุมัติหนังสือฉบับจริงแล้ว และต้องการเปลี่ยนสถานะเป็นอนุมัติ 100% หรือไม่',
       )
-      if (!ok) return
+      if (!ok) return { saved: false, mission: 'skipped' }
       const saved = await updateRequest(request.id, {
         status: 'approved',
         director_approval_status: 'approved',
@@ -221,13 +237,16 @@ export function AdminDashboard() {
           statusLabel: 'อนุมัติแล้ว (ล็อกคิว)',
           text: buildStatusMessage(approved, 'อนุมัติแล้ว (ล็อกคิว)'),
         })
+        // 🟢 ต่อจากแจ้งผู้ขอ/กลุ่ม: ตามด้วยใบสั่งงานฉบับเต็มถ้ามีการจัดสรคนขับไว้แล้ว
+        const mission = await sendDriverMissionNotice(approved)
+        return { saved: true, mission }
       }
-      return
+      return { saved: false, mission: 'skipped' }
     }
 
     if (request.status === 'pending') {
       const ok = window.confirm('ยืนยันการอนุมัติคำขอนี้ หรือไม่')
-      if (!ok) return
+      if (!ok) return { saved: false, mission: 'skipped' }
       const saved = await updateRequest(request.id, { status: 'approved' })
       if (saved) {
         const approved = { ...request, status: 'approved' }
@@ -237,8 +256,12 @@ export function AdminDashboard() {
           statusLabel: 'อนุมัติแล้ว (ล็อกคิว)',
           text: buildStatusMessage(approved, 'อนุมัติแล้ว (ล็อกคิว)'),
         })
+        // 🟢 ต่อจากแจ้งผู้ขอ/กลุ่ม: ตามด้วยใบสั่งงานฉบับเต็มถ้ามีการจัดสรคนขับไว้แล้ว
+        const mission = await sendDriverMissionNotice(approved)
+        return { saved: true, mission }
       }
     }
+    return { saved: false, mission: 'skipped' }
   }
 
   const reject = async (request) => {
@@ -594,6 +617,7 @@ const saveAllocation = async (request, allocation) => {
         onReject={reject}
         onCancel={cancelApprovedRequest}
         onSaveAllocation={saveAllocation}
+        onSendDriverMission={sendDriverMissionNotice}
         canManageAllocation={isAdmin && selected?.status !== 'cancelled'}
         canCancelRequest={isAdmin}
         canReviewRequest={
@@ -813,6 +837,7 @@ function RequestDetail({
   onReject,
   onCancel,
   onSaveAllocation,
+  onSendDriverMission,
   canManageAllocation,
   canCancelRequest,
   canReviewRequest,
@@ -826,6 +851,10 @@ function RequestDetail({
     driverId: '',
     externalDriver: '',
   })
+  // แถบสถานะภายในหน้าต่าง: { tone: 'amber' | 'green', text, sub? }
+  // จะแสดงหลังบันทึกการจัดสรร / หลังอนุมัติ — หน้าต่างไม่ปิดเอง ให้ผู้ใช้กดปิดเอง
+  const [allocationStatus, setAllocationStatus] = useState(null)
+  const [approveStatus, setApproveStatus] = useState(null)
 
   useEffect(() => {
     if (!request) return
@@ -837,6 +866,8 @@ function RequestDetail({
       driverId: request.assigned_driver_id || '',
       externalDriver: request.external_driver_name || '',
     })
+    setAllocationStatus(null)
+    setApproveStatus(null)
   }, [request])
 
   if (!request) return null
@@ -846,13 +877,67 @@ function RequestDetail({
   const driver = drivers.find((item) => item.id === request.assigned_driver_id)
 
   const submitAllocation = async () => {
+    setAllocationStatus(null)
     const saved = await onSaveAllocation(request, allocation)
-    if (saved) onClose()
+    if (!saved) return
+    const driverAllocated = allocation.driverMode === 'internal'
+      ? Boolean(allocation.driverId)
+      : Boolean(allocation.externalDriver.trim())
+    if (!driverAllocated) {
+      setAllocationStatus({
+        tone: 'amber',
+        text: '✅ บันทึกการจัดสรรแล้ว (ยังไม่ได้จัดสรคนขับ)',
+        sub: 'ใบสั่งงานจะส่งให้คนขับเมื่อจัดสรคนขับเรียบร้อย • หน้าต่างยังเปิดอยู่ — กดปิดเมื่อพร้อม',
+      })
+      return
+    }
+
+    // ส่งใบสั่งงานให้คนขับตามสถานะ: approved → 🟢 ฉบับทางการ / pending-tentative → 🟠 ล่วงหน้า
+    const mission = await onSendDriverMission(request)
+    const approved = request.status === 'approved'
+    if (mission?.result === true) {
+      setAllocationStatus({
+        tone: approved ? 'green' : 'amber',
+        text: approved
+          ? '✅ บันทึกการจัดสรรแล้ว • ส่งใบสั่งงาน 🟢 ให้คนขับแล้ว'
+          : '✅ บันทึกการจัดสรรแล้ว • ส่งใบสั่งงานล่วงหน้า 🟠 ให้คนขับแล้ว (ยังไม่อนุมัติ)',
+        sub: approved
+          ? 'หน้าต่างยังเปิดอยู่ — กดปิดเมื่อพร้อม'
+          : 'กด "อนุมัติคำขอ / ล็อกคิว" เพื่อล็อกคิวและส่งใบสั่งงานฉบับทางการ 🟢 ต่อได้เลย • หน้าต่างยังเปิดอยู่',
+      })
+    } else {
+      setAllocationStatus({
+        tone: 'amber',
+        text: 'บันทึกการจัดสรรแล้ว แต่ส่งใบสั่งงานให้คนขับไม่สำเร็จ',
+        sub: `${mission?.detail || ''} • กด "บันทึกการจัดสรร" ซ้ำเพื่อส่งอีกครั้งได้`,
+      })
+    }
   }
 
 const handleApprove = async () => {
-  // อนุมัติสถานะเท่านั้น (ไม่แตะรถ/คนขับ)
-  await onApprove(request)
+  setApproveStatus(null)
+  // อนุมัติสถานะ (ไม่แตะรถ/คนขับ) — หากมีคนขับที่จัดสรรแล้ว ระบบจะส่งใบสั่งงาน 🟢 ให้คนขับตามอัตโนมัติ
+  const outcome = await onApprove(request)
+  if (!outcome?.saved) return
+  if (outcome.mission === true) {
+    setApproveStatus({
+      tone: 'green',
+      text: '✅ อนุมัติแล้ว (ล็อกคิว) • แจ้งผู้ขอ/กลุ่ม + ส่งใบสั่งงาน 🟢 ให้คนขับแล้ว',
+      sub: 'หน้าต่างยังเปิดอยู่ — กดปิดเมื่อพร้อม',
+    })
+  } else if (outcome.mission === 'error') {
+    setApproveStatus({
+      tone: 'amber',
+      text: 'อนุมัติแล้ว (ล็อกคิว) แต่ส่งใบสั่งงาน 🟢 ไม่สำเร็จ',
+      sub: `${outcome.detail || ''} • บันทึกการจัดสรรซ้ำเพื่อส่งใบสั่งงานอีกครั้งได้`,
+    })
+  } else {
+    setApproveStatus({
+      tone: 'green',
+      text: '✅ อนุมัติแล้ว (ล็อกคิว) • แจ้งผู้ขอและกลุ่มฝ่ายแล้ว',
+      sub: 'ยังไม่มีคนขับที่จัดสรร — บันทึกการจัดสรรในหน้าต่างนี้เพื่อส่งใบสั่งงาน 🟢 ให้คนขับ • หน้าต่างยังเปิดอยู่',
+    })
+  }
 }
 
   return (
@@ -1021,6 +1106,22 @@ const handleApprove = async () => {
             >
               {busy ? 'กำลังบันทึก...' : 'บันทึกการจัดสรร'}
             </button>
+
+            {allocationStatus ? (
+              <div
+                className={classNames(
+                  'rounded-xl border px-3.5 py-3 text-sm font-semibold',
+                  allocationStatus.tone === 'green'
+                    ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
+                    : 'border-amber-200 bg-amber-50 text-amber-800',
+                )}
+              >
+                <p>{allocationStatus.text}</p>
+                {allocationStatus.sub ? (
+                  <p className="mt-1 text-xs font-medium opacity-90">{allocationStatus.sub}</p>
+                ) : null}
+              </div>
+            ) : null}
           </div>
         </div> : null}
 
@@ -1054,6 +1155,21 @@ const handleApprove = async () => {
             >
               ไม่อนุมัติ
             </button>
+          </div>
+        ) : null}
+        {approveStatus ? (
+          <div
+            className={classNames(
+              'rounded-xl border px-3.5 py-3 text-sm font-semibold',
+              approveStatus.tone === 'green'
+                ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
+                : 'border-amber-200 bg-amber-50 text-amber-800',
+            )}
+          >
+            <p>{approveStatus.text}</p>
+            {approveStatus.sub ? (
+              <p className="mt-1 text-xs font-medium opacity-90">{approveStatus.sub}</p>
+            ) : null}
           </div>
         ) : null}
         {canCancelRequest && request.status === 'approved' ? (

@@ -171,16 +171,60 @@ function statusFlex(
   }
 }
 
-function driverFlex(request: CarRequestPayload, carLabel: string, driverName: string) {
+/**
+ * ใบสั่งงานส่วนตัวคนขับตามสถานะ
+ *  - approved    → 🟢 ใบสั่งงานฉบับทางการ (ล็อกคิว)
+ *  - pending / tentative → 🟠 ใบสั่งงานล่วงหน้า (ยังไม่อนุมัติ ผูกพันน้อย อาจเปลี่ยนแปลง)
+ */
+function driverFlex(request: CarRequestPayload, carLabel: string, driverName: string, approved = true) {
+  const statusText = `${statusEmoji(request.status)} ${
+    STATUS_LABEL[String(request.status || '')] || 'อัปเดตสถานะ'
+  }`
+
+  const theme = approved
+    ? {
+        headerColor: '#059669',
+        kickerColor: '#D1FAE5',
+        title: '✅ ใบสั่งงานขับรถ — อนุมัติแล้ว (ล็อกคิว)',
+        banner: bannerRow('🟢 อนุมัติเรียบร้อย — จัดสรรถือเป็นทางการ โปรดเตรียมรถที่จุดรับตามเวลา', {
+          background: '#D1FAE5',
+          color: '#065F46',
+        }),
+        carValueColor: '#047857',
+        statusRow: labelValueRow('สถานะ', `${statusText} — โปรดปฏิบัติหน้าที่ตามเวลา`, {
+          valueWeight: 'bold',
+          valueColor: '#047857',
+        }),
+      }
+    : {
+        headerColor: '#D97706',
+        kickerColor: '#FEF3C7',
+        title:
+          request.status === 'tentative'
+            ? '🟠 ใบสั่งงานล่วงหน้า — รอ ผอ.เขต ลงนามอนุมัติ'
+            : '🟠 ใบสั่งงานล่วงหน้า — รอตรวจสอบ/รออนุมัติ',
+        banner: bannerRow(
+          request.status === 'tentative'
+            ? '🟠 ยังไม่ได้รับการอนุมัติ (รอ ผอ.เขต ลงนาม) — โปรดเตรียมตัวล่วงหน้า และรอข้อความอนุมัติ (สีเขียว) ก่อนออกรถจริง'
+            : '🟠 ยังไม่ได้รับการอนุมัติ — จัดสรรล่วงหน้าเท่านั้น อาจมีการเปลี่ยนแปลง โปรดเตรียมตัวล่วงหน้าและรอข้อความอนุมัติ (สีเขียว) ก่อนออกรถจริง',
+          { background: '#FFEDD5', color: '#9A3412' },
+        ),
+        carValueColor: '#B45309',
+        statusRow: labelValueRow('สถานะ', `${statusText} — อาจมีการเปลี่ยนแปลง`, {
+          valueWeight: 'bold',
+          valueColor: '#B45309',
+        }),
+      }
+
   return {
     type: 'bubble',
-    styles: { header: { backgroundColor: '#059669' } },
+    styles: { header: { backgroundColor: theme.headerColor } },
     header: {
       type: 'box',
       layout: 'vertical',
       contents: [
-        { type: 'text', text: 'EduLP Car • ใบสั่งงานปฏิบัติหน้าที่', color: '#D1FAE5', size: 'xs', weight: 'bold' },
-        { type: 'text', text: '✅ ใบสั่งงานขับรถ — อนุมัติแล้ว', color: '#FFFFFF', size: 'md', weight: 'bold', wrap: true },
+        { type: 'text', text: 'EduLP Car • ใบสั่งงานปฏิบัติหน้าที่', color: theme.kickerColor, size: 'xs', weight: 'bold' },
+        { type: 'text', text: theme.title, color: '#FFFFFF', size: 'md', weight: 'bold', wrap: true },
       ],
     },
     body: {
@@ -188,6 +232,7 @@ function driverFlex(request: CarRequestPayload, carLabel: string, driverName: st
       layout: 'vertical',
       spacing: 'xs',
       contents: [
+        theme.banner,
         labelValueRow('เลขที่เอกสาร', request.doc_number || '-'),
         labelValueRow('วัน-เวลา', formatThaiDateTimeRange(request.start_datetime, request.end_datetime), {
           valueWeight: 'bold',
@@ -206,8 +251,9 @@ function driverFlex(request: CarRequestPayload, carLabel: string, driverName: st
           valueColor: '#1D4ED8',
         }),
         { type: 'separator', margin: 'sm' },
-        labelValueRow('รถยนต์', carLabel, { valueWeight: 'bold', valueColor: '#047857' }),
+        labelValueRow('รถยนต์', carLabel, { valueWeight: 'bold', valueColor: theme.carValueColor }),
         labelValueRow('พนักงานขับรถ', driverName),
+        theme.statusRow,
       ],
     },
   }
@@ -266,8 +312,13 @@ Deno.serve(async (req) => {
 
   if (payload.type === 'driver_assigned') {
     if (profile.role !== 'admin') return json({ error: 'Admin access is required' }, 403)
-    if (request.status !== 'approved') {
-      return json({ error: 'Driver instructions can only be sent for approved requests' }, 409)
+    // 🟠 จัดสรรล่วงหน้าได้ตั้งแต่สถานะ pending/tentative (ใบสั่งงานโทนส้ม) / 🟢 เมื่อ approved ใบสั่งงานโทนเขียว
+    const isApproved = request.status === 'approved'
+    if (!isApproved && request.status !== 'pending' && request.status !== 'tentative') {
+      return json(
+        { error: 'Driver instructions can only be sent for pending, tentative, or approved requests' },
+        409,
+      )
     }
     if (!request.assigned_driver_id && !request.external_driver_name) {
       return json({ error: 'No driver is assigned' }, 400)
@@ -305,8 +356,13 @@ Deno.serve(async (req) => {
     }
     const result = await pushFlex(
       driverLineId,
-      'ใบสั่งงานพนักงานขับรถ',
-      driverFlex(requestData, carLabel, driver ? (driver.nickname ? `${driver.nickname} - ${driver.full_name}` : driver.full_name) : request.external_driver_name || 'พนักงานขับรถ'),
+      isApproved ? 'ใบสั่งงานพนักงานขับรถ' : 'ใบสั่งงานล่วงหน้า (ยังไม่อนุมัติ)',
+      driverFlex(
+        requestData,
+        carLabel,
+        driver ? (driver.nickname ? `${driver.nickname} - ${driver.full_name}` : driver.full_name) : request.external_driver_name || 'พนักงานขับรถ',
+        isApproved,
+      ),
     )
     return json({ target: 'driver_private', result }, result.ok ? 200 : 502)
   }

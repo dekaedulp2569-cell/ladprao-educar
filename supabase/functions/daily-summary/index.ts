@@ -240,7 +240,7 @@ function weeklySummaryContents(title: string, driverGroups: Map<string, string[]
             ],
       },
     })
-  })
+  }
   return [cards.length === 1 ? cards[0] : { type: 'carousel', contents: cards }]
 }
 
