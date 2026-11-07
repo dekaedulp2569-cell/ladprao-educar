@@ -8,7 +8,7 @@
 // หากยังไม่ได้ตั้งค่า ฟังก์ชันจะคืน { skipped: true } เพื่อไม่ให้การบันทึกข้อมูลล้มเหลว
 
 import { supabase } from './supabase'
-import { formatDateTimeRange } from './helpers'
+import { formatDateTimeRange, formatDestinationWithProvince } from './helpers'
 
 export { formatDateTimeRange }
 
@@ -63,7 +63,7 @@ export function buildStatusMessage(request, statusLabel) {
     `เลขที่เอกสาร: ${request.doc_number || '-'}`,
     `ผู้ขอ: ${request.requester_name || '-'}`,
     `วัตถุประสงค์: ${request.purpose || '-'}`,
-    `ปลายทาง: ${request.destination || '-'} (${request.destination_province || '-'})`,
+    `ปลายทาง: ${formatDestinationWithProvince(request.destination, request.destination_province) || '-'}`,
     `วันเวลา: ${formatDateTimeRange(request.start_datetime, request.end_datetime)}`,
     `สถานะล่าสุด: ${statusLabel}`,
   ]
@@ -74,7 +74,7 @@ export function buildDriverMessage(request, carLabel) {
   const lines = [
     '📋 งานใหม่ที่ได้รับมอบหมาย',
     `วันเวลา: ${formatDateTimeRange(request.start_datetime, request.end_datetime)}`,
-    `ปลายทาง: ${request.destination || '-'} (${request.destination_province || '-'})`,
+    `ปลายทาง: ${formatDestinationWithProvince(request.destination, request.destination_province) || '-'}`,
     `รถ: ${carLabel || '-'}`,
     `ผู้ขอ: ${request.requester_name || '-'}`,
     `ผู้โดยสาร: ${request.passenger_count ?? '-'} คน`,

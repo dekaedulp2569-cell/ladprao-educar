@@ -1,4 +1,10 @@
-import { bangkokParts, carTypeDisplay, THAI_MONTHS_LONG, toThaiDigits } from './helpers.js'
+import {
+  bangkokParts,
+  carTypeDisplay,
+  formatDestinationWithProvince,
+  THAI_MONTHS_LONG,
+  toThaiDigits,
+} from './helpers.js'
 
 const OUT_OF_HOURS_RECIPIENT = 'ปลัดกรุงเทพมหานคร'
 const BUSINESS_HOURS_RECIPIENT = 'ผู้อำนวยการเขตลาดพร้าว'
@@ -101,10 +107,10 @@ export function generateForm3Html(request, car, driver, recipient) {
     request.requester_department || 'ฝ่ายการศึกษา สำนักงานเขตลาดพร้าว',
   )
 
-  const destFull = [
-    request.destination || '',
-    request.destination_province ? ` (${request.destination_province})` : '',
-  ].join('').trim()
+  const destFull = formatDestinationWithProvince(
+    request.destination,
+    request.destination_province,
+  )
   const destLines = splitTextTwoLines(toThaiDigits(destFull), 52)
   const destLine1 = escapeHtml(destLines.line1)
   const destLine2 = escapeHtml(destLines.line2)

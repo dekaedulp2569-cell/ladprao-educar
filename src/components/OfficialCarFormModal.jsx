@@ -1,5 +1,11 @@
 import { useMemo, useState } from 'react'
-import { bangkokParts, carTypeDisplay, THAI_MONTHS_LONG, toThaiDigits } from '../lib/helpers'
+import {
+  bangkokParts,
+  carTypeDisplay,
+  formatDestinationWithProvince,
+  THAI_MONTHS_LONG,
+  toThaiDigits,
+} from '../lib/helpers'
 import { countVisibleChars, openForm3PrintWindow, splitTextTwoLines } from '../lib/printForm3'
 
 export function OfficialCarFormModal({ open, onClose, request, car, driver }) {
@@ -51,10 +57,10 @@ export function OfficialCarFormModal({ open, onClose, request, car, driver }) {
     request.requester_department || 'ฝ่ายการศึกษา สำนักงานเขตลาดพร้าว',
   )
 
-  const destFull = [
-    request.destination || '',
-    request.destination_province ? ` (${request.destination_province})` : '',
-  ].join('').trim()
+  const destFull = formatDestinationWithProvince(
+    request.destination,
+    request.destination_province,
+  )
   const destLines = splitTextTwoLines(toThaiDigits(destFull), 52)
   const isDestLong = countVisibleChars(destFull) > 45
 

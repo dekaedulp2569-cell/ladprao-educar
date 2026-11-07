@@ -140,6 +140,58 @@ export function isOutOfBkk(province) {
   return province !== 'กรุงเทพมหานคร'
 }
 
+/**
+ * จัดรูปแบบชื่อจังหวัดตามระเบียบงานสารบรรณ
+ * จังหวัดทั่วไป: ใส่ "จ." นำหน้า เช่น "จ.สมุทรปราการ", "จ.ชลบุรี"
+ * ยกเว้น กรุงเทพมหานคร: ไม่มี "จ." ให้แสดง "กรุงเทพมหานคร"
+ */
+export function formatProvince(province) {
+  if (!province) return ''
+  const trimmed = String(province).trim()
+  if (!trimmed) return ''
+  if (
+    trimmed === 'กรุงเทพมหานคร' ||
+    trimmed === 'กรุงเทพฯ' ||
+    trimmed === 'กทม.' ||
+    trimmed === 'กทม'
+  ) {
+    return 'กรุงเทพมหานคร'
+  }
+  if (trimmed.startsWith('จ.') || trimmed.startsWith('จังหวัด')) {
+    return trimmed
+  }
+  return `จ.${trimmed}`
+}
+
+/**
+ * รวมข้อความปลายทางและจังหวัด
+ * ถ้าใน destination มีชื่อจังหวัดอยู่แล้ว จะไม่ใส่ซ้ำ
+ * ถ้ามี (จังหวัด) อยู่ จะแปลงเป็น จ.จังหวัด
+ */
+export function formatDestinationWithProvince(destination, province) {
+  let dest = String(destination || '').trim()
+  const prov = formatProvince(province)
+  if (!prov) return dest
+  if (!dest) return prov
+
+  const rawProv = String(province || '').trim()
+  // ถ้ามีวงเล็บชื่อจังหวัด เช่น (สมุทรปราการ) ให้เปลี่ยนเป็น prov
+  if (dest.includes(`(${rawProv})`)) {
+    return dest.replace(`(${rawProv})`, prov).trim()
+  }
+
+  // ถ้ามีชื่อจังหวัดหรือ prov อยู่แล้ว ไม่ต้องต่อท้ายซ้ำ
+  if (
+    dest.includes(prov) ||
+    dest.includes(rawProv) ||
+    (rawProv === 'กรุงเทพมหานคร' && (dest.includes('กทม') || dest.includes('กรุงเทพ')))
+  ) {
+    return dest
+  }
+
+  return `${dest} ${prov}`
+}
+
 /** ตรวจว่าช่วงเดินทางมีวันเสาร์หรืออาทิตย์อย่างน้อยหนึ่งวันหรือไม่ */
 export function includesWeekend(startLocal, endLocal) {
   if (!startLocal || !endLocal) return false
