@@ -1,3 +1,4 @@
+import html2pdf from 'html2pdf.js'
 import {
   bangkokParts,
   carTypeDisplay,
@@ -144,7 +145,51 @@ export function generateForm3Html(request, car, driver, recipient) {
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
   <style>
+    @font-face {
+      font-family: 'TH Sarabun IT9';
+      src: url('/fonts/THSarabunIT9-Regular.ttf') format('truetype');
+      font-weight: normal;
+      font-style: normal;
+      font-display: swap;
+    }
+    @font-face {
+      font-family: 'TH Sarabun IT9';
+      src: url('/fonts/THSarabunIT9-Bold.ttf') format('truetype');
+      font-weight: bold;
+      font-style: normal;
+      font-display: swap;
+    }
+    @font-face {
+      font-family: 'TH Sarabun IT9';
+      src: url('/fonts/THSarabunIT9-Italic.ttf') format('truetype');
+      font-weight: normal;
+      font-style: italic;
+      font-display: swap;
+    }
+    @font-face {
+      font-family: 'TH Sarabun IT9';
+      src: url('/fonts/THSarabunIT9-BoldItalic.ttf') format('truetype');
+      font-weight: bold;
+      font-style: italic;
+      font-display: swap;
+    }
+    @font-face {
+      font-family: 'TH Sarabun IT๙';
+      src: url('/fonts/THSarabunIT9-Regular.ttf') format('truetype');
+      font-weight: normal;
+      font-style: normal;
+      font-display: swap;
+    }
+    @font-face {
+      font-family: 'TH Sarabun IT๙';
+      src: url('/fonts/THSarabunIT9-Bold.ttf') format('truetype');
+      font-weight: bold;
+      font-style: normal;
+      font-display: swap;
+    }
+
     @page {
       size: A4 portrait;
       margin: 0;
@@ -157,7 +202,7 @@ export function generateForm3Html(request, car, driver, recipient) {
       padding: 0;
       background: #525659;
       color: #000;
-      font-family: "TH Sarabun New", "TH SarabunPSK", "Sarabun", sans-serif;
+      font-family: "TH Sarabun IT9", "TH Sarabun IT๙", "TH Sarabun New", "TH SarabunPSK", "Sarabun", sans-serif;
       -webkit-print-color-adjust: exact;
       print-color-adjust: exact;
     }
@@ -168,20 +213,24 @@ export function generateForm3Html(request, car, driver, recipient) {
       gap: 12px; padding: 10px 24px;
       background: #1e293b; color: #fff;
       box-shadow: 0 2px 10px rgba(0,0,0,0.35);
+      flex-wrap: wrap;
     }
     .toolbar-info { display: flex; align-items: center; gap: 10px; font-size: 14px; }
     .toolbar-badge {
       display: inline-block; padding: 2px 8px; background: #047857;
       border-radius: 6px; font-size: 12px; font-weight: 600;
     }
-    .toolbar-actions { display: flex; align-items: center; gap: 8px; }
+    .toolbar-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
     .btn {
       display: inline-flex; align-items: center; gap: 6px;
       padding: 7px 16px; border-radius: 6px; font-size: 13px;
       font-weight: 600; cursor: pointer; border: none; font-family: inherit;
+      transition: background 0.15s ease;
     }
     .btn-primary { background: #059669; color: #fff; }
     .btn-primary:hover { background: #047857; }
+    .btn-download { background: #2563eb; color: #fff; }
+    .btn-download:hover { background: #1d4ed8; }
     .btn-secondary { background: #475569; color: #fff; }
     .btn-secondary:hover { background: #334155; }
 
@@ -330,10 +379,11 @@ export function generateForm3Html(request, car, driver, recipient) {
   <div class="toolbar no-print">
     <div class="toolbar-info">
       <span class="toolbar-badge">A4 Portrait</span>
-      <span>แบบ ๓ ใบขออนุญาตใช้รถส่วนกลาง</span>
+      <span>แบบ ๓ ใบขออนุญาตใช้รถส่วนกลาง (ฟอนต์ TH Sarabun IT๙)</span>
     </div>
     <div class="toolbar-actions">
-      <button class="btn btn-primary" onclick="window.print()">🖨️ พิมพ์เอกสาร (Print / PDF)</button>
+      <button class="btn btn-download" id="btn-download-pdf" onclick="downloadPdf()">📥 ดาวน์โหลด PDF (สำหรับมือถือ)</button>
+      <button class="btn btn-primary" onclick="window.print()">🖨️ พิมพ์เอกสาร (Print)</button>
       <button class="btn btn-secondary" onclick="window.close()">✕ ปิด</button>
     </div>
   </div>
@@ -469,6 +519,73 @@ export function generateForm3Html(request, car, driver, recipient) {
       </div>
     </main>
   </div>
+
+  <script>
+    async function downloadPdf() {
+      const btn = document.getElementById('btn-download-pdf');
+      const originalText = btn.innerHTML;
+      btn.innerHTML = '⏳ กำลังสร้าง PDF...';
+      btn.disabled = true;
+
+      try {
+        if (document.fonts && document.fonts.ready) {
+          await document.fonts.ready;
+        }
+        const element = document.querySelector('.a4-page');
+        const opt = {
+          margin: 0,
+          filename: 'แบบ๓_ใบขออนุญาตใช้รถส่วนกลาง.pdf',
+          image: { type: 'jpeg', quality: 0.98 },
+          html2canvas: { scale: 2, useCORS: true, logging: false },
+          jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+        };
+
+        if (window.html2pdf) {
+          const worker = window.html2pdf().set(opt).from(element);
+          const pdfBlob = await worker.output('blob');
+          const pdfFile = new File([pdfBlob], 'แบบ๓_ใบขออนุญาตใช้รถส่วนกลาง.pdf', { type: 'application/pdf' });
+
+          const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+          if (isMobile && navigator.canShare && navigator.canShare({ files: [pdfFile] })) {
+            try {
+              await navigator.share({
+                files: [pdfFile],
+                title: 'แบบ ๓ ใบขออนุญาตใช้รถส่วนกลาง',
+                text: 'แบบ ๓ ใบขออนุญาตใช้รถส่วนกลาง (ฟอนต์ TH Sarabun IT๙)',
+              });
+              btn.innerHTML = originalText;
+              btn.disabled = false;
+              return;
+            } catch (shareErr) {
+              if (shareErr.name === 'AbortError') {
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+                return;
+              }
+            }
+          }
+
+          const url = URL.createObjectURL(pdfBlob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = 'แบบ๓_ใบขออนุญาตใช้รถส่วนกลาง.pdf';
+          document.body.appendChild(a);
+          a.click();
+          setTimeout(() => {
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+          }, 1500);
+        } else {
+          window.print();
+        }
+      } catch (err) {
+        alert('เกิดข้อผิดพลาดในการสร้าง PDF: ' + err.message);
+      } finally {
+        btn.innerHTML = originalText;
+        btn.disabled = false;
+      }
+    }
+  </script>
 </body>
 </html>`
 }
@@ -487,4 +604,71 @@ export function openForm3PrintWindow(request, car, driver, recipient) {
   win.document.write(html)
   win.document.close()
   win.focus()
+}
+
+/**
+ * ฟังก์ชันสร้างและดาวน์โหลดไฟล์ PDF โดยตรงบนโทรศัพท์มือถือและเดสก์ท็อป
+ * ใช้ฟอนต์ TH Sarabun IT๙ ตามมาตรฐาน
+ */
+export async function downloadForm3AsPdf(element, filename = 'แบบ๓_ใบขออนุญาตใช้รถส่วนกลาง.pdf') {
+  if (!element) return false
+
+  if (document.fonts?.ready) {
+    try {
+      await document.fonts.ready
+    } catch (e) {
+      console.warn('Font loading check:', e)
+    }
+  }
+
+  const opt = {
+    margin: 0,
+    filename,
+    image: { type: 'jpeg', quality: 0.98 },
+    html2canvas: {
+      scale: 2,
+      useCORS: true,
+      logging: false,
+      letterRendering: true,
+      windowWidth: element.scrollWidth,
+    },
+    jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+  }
+
+  try {
+    const worker = html2pdf().set(opt).from(element)
+    const pdfBlob = await worker.output('blob')
+    const pdfFile = new File([pdfBlob], filename, { type: 'application/pdf' })
+
+    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)
+    if (isMobile && navigator.canShare && navigator.canShare({ files: [pdfFile] })) {
+      try {
+        await navigator.share({
+          files: [pdfFile],
+          title: 'แบบ ๓ ใบขออนุญาตใช้รถส่วนกลาง',
+          text: 'เอกสารแบบ ๓ ใบขออนุญาตใช้รถส่วนกลาง (ฟอนต์ TH Sarabun IT๙)',
+        })
+        return true
+      } catch (shareErr) {
+        if (shareErr.name === 'AbortError') return true
+        console.warn('Share API cancelled or failed, falling back to download:', shareErr)
+      }
+    }
+
+    const url = URL.createObjectURL(pdfBlob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = filename
+    document.body.appendChild(a)
+    a.click()
+    setTimeout(() => {
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+    }, 1500)
+
+    return true
+  } catch (err) {
+    console.error('Error generating PDF:', err)
+    throw err
+  }
 }

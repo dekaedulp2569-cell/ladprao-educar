@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import {
   bangkokParts,
   carTypeDisplay,
@@ -6,10 +6,17 @@ import {
   THAI_MONTHS_LONG,
   toThaiDigits,
 } from '../lib/helpers'
-import { countVisibleChars, openForm3PrintWindow, splitTextTwoLines } from '../lib/printForm3'
+import {
+  countVisibleChars,
+  downloadForm3AsPdf,
+  openForm3PrintWindow,
+  splitTextTwoLines,
+} from '../lib/printForm3'
 
 export function OfficialCarFormModal({ open, onClose, request, car, driver }) {
   const [recipientSelection, setRecipientSelection] = useState(null)
+  const [isDownloadingPdf, setIsDownloadingPdf] = useState(false)
+  const printRef = useRef(null)
 
   const defaultRecipient =
     request?.approval_type === 'district_director' || request?.is_out_of_bkk || request?.is_out_of_hours
@@ -32,6 +39,20 @@ export function OfficialCarFormModal({ open, onClose, request, car, driver }) {
 
   const handlePrint = () => {
     openForm3PrintWindow(request, car, driver, recipient)
+  }
+
+  const handleDownloadPdf = async () => {
+    if (!printRef.current || isDownloadingPdf) return
+    setIsDownloadingPdf(true)
+    try {
+      const sanitizedName = (request.requester_name || 'ราชการ').replace(/\s+/g, '_')
+      const fileName = `แบบ๓_ใบขออนุญาตใช้รถ_${sanitizedName}_${startDay || 'วดป'}.pdf`
+      await downloadForm3AsPdf(printRef.current, fileName)
+    } catch (err) {
+      alert('ไม่สามารถสร้างไฟล์ PDF ได้: ' + (err?.message || err))
+    } finally {
+      setIsDownloadingPdf(false)
+    }
   }
 
   const reqDay = reqParts ? toThaiDigits(Number(reqParts.day)) : ''
@@ -89,7 +110,7 @@ export function OfficialCarFormModal({ open, onClose, request, car, driver }) {
             <p className="text-xs text-slate-500">เอกสารสำหรับลงนามสั่งใช้รถตามระเบียบกรุงเทพมหานคร</p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <select
             value={recipient}
             onChange={(e) => setRecipientSelection({ request, value: e.target.value })}
@@ -100,15 +121,29 @@ export function OfficialCarFormModal({ open, onClose, request, car, driver }) {
           </select>
           <button
             type="button"
+            disabled={isDownloadingPdf}
+            onClick={handleDownloadPdf}
+            className="flex items-center gap-1.5 rounded-lg bg-blue-600 px-3.5 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-blue-700 disabled:opacity-60 cursor-pointer"
+          >
+            {isDownloadingPdf ? (
+              <>
+                <span className="inline-block animate-spin">⏳</span> กำลังสร้าง PDF...
+              </>
+            ) : (
+              <>📥 ดาวน์โหลด PDF (สำหรับมือถือ)</>
+            )}
+          </button>
+          <button
+            type="button"
             onClick={handlePrint}
-            className="flex items-center gap-1.5 rounded-lg bg-emerald-700 px-3.5 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-emerald-800"
+            className="flex items-center gap-1.5 rounded-lg bg-emerald-700 px-3.5 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-emerald-800 cursor-pointer"
           >
             🖨️ พิมพ์เอกสาร A4 (แท็บใหม่)
           </button>
           <button
             type="button"
             onClick={onClose}
-            className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-600 transition hover:bg-slate-100"
+            className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-600 transition hover:bg-slate-100 cursor-pointer"
           >
             ✕ ปิด
           </button>
@@ -118,6 +153,7 @@ export function OfficialCarFormModal({ open, onClose, request, car, driver }) {
       {/* แผ่นกระดาษ A4 จำลอง */}
       <div className="overflow-x-auto pb-8 print:p-0">
         <div
+          ref={printRef}
           className="mx-auto bg-white text-black shadow-2xl print:shadow-none"
           style={{
             width: '210mm',
@@ -126,7 +162,7 @@ export function OfficialCarFormModal({ open, onClose, request, car, driver }) {
             overflow: 'hidden',
             padding: '15mm 20mm 12mm 25mm',
             boxSizing: 'border-box',
-            fontFamily: '"TH Sarabun New", "TH SarabunPSK", "Sarabun", sans-serif',
+            fontFamily: '"TH Sarabun IT9", "TH Sarabun IT๙", "TH Sarabun New", "TH SarabunPSK", "Sarabun", sans-serif',
             fontSize: '16pt',
             lineHeight: 1.4,
           }}
