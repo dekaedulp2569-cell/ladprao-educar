@@ -13,12 +13,41 @@ function escapeHtml(value) {
 }
 
 function printable(value) {
+  if (value === null || value === undefined || value === '') return ''
   return escapeHtml(toThaiDigits(value))
+}
+
+/**
+ * ตัดแบ่งข้อความเป็น ๒ บรรทัดตามหลักเอกสารราชการ
+ * ถ้ามี \n จะตัดตามบรรทัดที่ผู้ใช้เคาะไว้
+ * ถ้าไม่มี จะพยายามตัดที่ช่องว่างใกล้เคียง maxLine1Chars
+ */
+export function splitTextTwoLines(text, maxLine1Chars = 42) {
+  if (!text) return { line1: '', line2: '' }
+  const raw = String(text).trim()
+  if (raw.includes('\n')) {
+    const lines = raw.split('\n').map((l) => l.trim()).filter(Boolean)
+    return {
+      line1: lines[0] || '',
+      line2: lines.slice(1).join(' ') || '',
+    }
+  }
+  if (raw.length <= maxLine1Chars) {
+    return { line1: raw, line2: '' }
+  }
+  let splitIdx = raw.lastIndexOf(' ', maxLine1Chars)
+  if (splitIdx < Math.floor(maxLine1Chars * 0.5)) {
+    splitIdx = maxLine1Chars
+  }
+  return {
+    line1: raw.substring(0, splitIdx).trim(),
+    line2: raw.substring(splitIdx).trim(),
+  }
 }
 
 function dateValue(parts) {
   if (!parts) {
-    return { day: '..........', month: '....................', year: '..........', time: '..........' }
+    return { day: '', month: '', year: '', time: '' }
   }
   return {
     day: toThaiDigits(Number(parts.day)),
@@ -40,18 +69,32 @@ export function generateForm3Html(request, car, driver, recipient) {
     request.approval_type === 'district_director' || request.is_out_of_bkk || request.is_out_of_hours
   const selectedRecipient =
     recipient || (isSpecialApproval ? OUT_OF_HOURS_RECIPIENT : BUSINESS_HOURS_RECIPIENT)
+
   const requesterName = printable(request.requester_name || '')
   const requesterPosition = printable(request.requester_position || '')
-  const requesterDepartment = printable(
-    request.requester_department || 'ฝ่ายการศึกษา สำนักงานเขตลาดพร้าว',
-  )
-  const destination = printable(request.destination || '')
-  const province = request.destination_province ? ` (${printable(request.destination_province)})` : ''
-  const purpose = printable(request.purpose || '')
+
+  const destFull = [
+    request.destination || '',
+    request.destination_province ? ` (${request.destination_province})` : '',
+  ].join('').trim()
+  const destLines = splitTextTwoLines(toThaiDigits(destFull), 42)
+  const destLine1 = escapeHtml(destLines.line1)
+  const destLine2 = escapeHtml(destLines.line2)
+
+  const purposeFull = request.purpose || ''
+  const purposeLines = splitTextTwoLines(toThaiDigits(purposeFull), 54)
+  const purposeLine1 = escapeHtml(purposeLines.line1)
+  const purposeLine2 = escapeHtml(purposeLines.line2)
+
   const passengerCount = printable(request.passenger_count || 1)
-  const carType = printable(car ? carTypeDisplay(car.car_type) : 'รถตู้')
+  const carType = printable(
+    car ? carTypeDisplay(car.car_type) : (request.car_type ? carTypeDisplay(request.car_type) : '-'),
+  )
   const carPlate = printable(car?.license_plate || request.external_car_info || '')
   const driverName = printable(driver?.full_name || request.external_driver_name || '')
+
+  const startDateStr = startsAt.day ? `${startsAt.day} ${startsAt.month} ${startsAt.year}` : ''
+  const endDateStr = endsAt.day ? `${endsAt.day} ${endsAt.month} ${endsAt.year}` : ''
 
   return `<!DOCTYPE html>
 <html lang="th">
@@ -72,386 +115,394 @@ export function generateForm3Html(request, car, driver, recipient) {
       box-sizing: border-box;
     }
 
-    html,
-    body {
+    html, body {
       margin: 0;
-      min-height: 100%;
-      background: #fff;
+      padding: 0;
+      background: #525659;
       color: #000;
       font-family: "TH Sarabun New", "TH SarabunPSK", "Sarabun", sans-serif;
       -webkit-print-color-adjust: exact;
       print-color-adjust: exact;
     }
 
+    .toolbar {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 10px 24px;
+      background: #1e293b;
+      color: #fff;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.35);
+    }
+
+    .toolbar-info {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 14px;
+    }
+
+    .toolbar-badge {
+      display: inline-block;
+      padding: 2px 8px;
+      background: #047857;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+    }
+
+    .toolbar-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 7px 16px;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      border: none;
+      transition: all 0.15s ease-in-out;
+      font-family: inherit;
+    }
+
+    .btn-primary {
+      background: #059669;
+      color: #fff;
+    }
+
+    .btn-primary:hover {
+      background: #047857;
+    }
+
+    .btn-secondary {
+      background: #475569;
+      color: #fff;
+    }
+
+    .btn-secondary:hover {
+      background: #334155;
+    }
+
+    .a4-container {
+      padding: 24px 0 48px;
+      display: flex;
+      justify-content: center;
+    }
+
     .a4-page {
       width: 210mm;
-      min-height: 297mm;
+      height: 297mm;
+      max-height: 297mm;
+      background: #fff;
       margin: 0 auto;
-      padding: 8mm 15mm 10mm 15mm;
-      font-size: 14pt;
-      font-weight: 400;
-      line-height: 1.2;
+      padding: 18mm 20mm 16mm 25mm;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
+      position: relative;
+      font-size: 16pt;
+      line-height: 1.45;
+      overflow: hidden;
+      break-after: avoid-page;
+      page-break-after: avoid;
     }
 
     .form-number {
       text-align: right;
       font-weight: 700;
+      font-size: 16pt;
       line-height: 1;
-      margin-bottom: 3mm;
+      margin-bottom: 2mm;
     }
 
-    .title {
-      margin: 3mm 0 4mm;
+    .form-title {
       text-align: center;
-      font-size: 20pt;
       font-weight: 700;
+      font-size: 20pt;
+      line-height: 1.2;
+      margin: 0 0 4mm 0;
+    }
+
+    .form-row {
+      display: flex;
+      align-items: baseline;
+      min-height: 7.2mm;
+      line-height: 1.45;
+      margin: 0;
+      position: relative;
+    }
+
+    .row-label {
+      white-space: nowrap;
+      flex: none;
+    }
+
+    .dotted-fill {
+      flex: 1;
+      min-width: 0;
+      border-bottom: 1px dotted #000;
+      padding: 0 4px 1px 4px;
       line-height: 1.2;
     }
 
-    .request-date {
+    .dotted-field {
+      display: inline-block;
+      border-bottom: 1px dotted #000;
+      padding: 0 4px 1px 4px;
+      line-height: 1.2;
+      flex: none;
+    }
+
+    .dotted-line {
+      display: inline-block;
+      border-bottom: 1px dotted #000;
+      height: 1em;
+      flex: none;
+    }
+
+    .indent-gov {
+      padding-left: 25mm;
+    }
+
+    .top-date-row {
+      display: flex;
+      align-items: baseline;
+      margin-left: 50%;
+      margin-bottom: 2mm;
+      min-height: 7.2mm;
+    }
+
+    .requester-sig-block {
+      margin-top: 14mm;
       display: flex;
       align-items: baseline;
       justify-content: flex-end;
-      gap: 1mm;
-      margin: 0 0 5mm;
-      text-align: right;
-      white-space: nowrap;
+      width: 100%;
     }
 
-    .date-field {
-      display: inline-block;
-      min-width: 12mm;
-      padding: 0 1mm 0.5mm;
-      border-bottom: 1px dotted #000;
-      text-align: center;
-      white-space: nowrap;
-    }
-
-    .date-field.month {
-      min-width: 26mm;
-    }
-
-    .date-field.year {
-      min-width: 20mm;
-    }
-
-    .recipient {
-      margin: 0 0 5mm;
-    }
-
-    .details {
+    .head-sig-block {
       margin-top: 6mm;
+      margin-left: 48%;
+      width: 52%;
     }
 
-    .detail-row {
-      min-height: 7mm;
-      margin: 0;
-      line-height: 1.3;
-      display: flex;
-      align-items: baseline;
-      gap: 1mm;
-      flex-wrap: wrap;
-    }
-
-    .field-line {
-      display: inline-block;
-      min-width: 0;
-      padding: 0 1mm 0.5mm;
-      border-bottom: 1px dotted #000;
-      text-align: left;
-      white-space: normal;
-      word-break: break-word;
-    }
-
-    .destination-line,
-    .purpose-line,
-    .travel-date-line,
-    .license-plate-line {
-      flex: 1;
-    }
-
-    .passenger-line {
-      width: 14mm;
-    }
-
-    .vehicle-type-line {
-      width: 42mm;
-    }
-
-    .travel-time-line {
-      width: 19mm;
-    }
-
-    .requester-identity {
-      display: flex;
-      align-items: baseline;
-      gap: 1mm;
-      padding-left: 20mm;
-      flex-wrap: wrap;
-      white-space: normal;
-    }
-
-    .requester-name-group,
-    .requester-position-group {
-      display: flex;
-      align-items: baseline;
-      gap: 1mm;
-      min-width: 0;
-    }
-
-    .requester-name-group {
-      flex: 1.05;
-    }
-
-    .requester-position-group {
-      flex: 0.95;
-    }
-
-    .requester-name-line,
-    .requester-position-line {
-      flex: 1;
-    }
-
-    .signature {
-      width: max-content;
-      max-width: 100%;
-      margin-left: auto;
-      text-align: center;
-      line-height: 1.4;
-    }
-
-    .signature-line {
+    .head-sig-block .sig-row {
       display: flex;
       align-items: baseline;
       width: 100%;
-      white-space: nowrap;
     }
 
-    .signature-leader {
-      flex: 1;
-      min-width: 4mm;
-      margin: 0 1mm;
-      border-bottom: 1px dotted #000;
-    }
-
-    .requester-signature {
-      margin-top: 10mm;
-      margin-bottom: 0;
-    }
-
-    .review-signature {
-      width: 98mm;
-      margin-top: 8mm;
-      margin-bottom: 0;
-      text-align: left;
-    }
-
-    .review-signature .signature-date {
-      width: 82mm;
-      margin-right: auto;
-      margin-left: auto !important;
-    }
-
-    .authority-signature {
-      width: 160mm;
-      margin-top: 8mm;
-      margin-bottom: 0;
-      text-align: left;
-    }
-
-    .authority-signature .signature-line {
-      width: 110mm;
-      margin-left: auto;
-    }
-
-    .authority-signature .signature-date {
-      width: 82mm;
-    }
-
-    .approval-order {
-      margin: 24mm 0 0;
-      text-align: center;
-      font-weight: 700;
-    }
-
-    .signature p {
-      margin: 0;
-    }
-
-    .vehicle {
-      margin-top: 5mm;
-    }
-
-    .vehicle p {
-      margin: 0;
-      min-height: 7.4mm;
-      line-height: 1.3;
-    }
-
-    .vehicle-type-line,
-    .license-plate-line {
-      padding-bottom: 0;
-    }
-
-    .vehicle .driver-row {
-      margin-top: 1mm;
-    }
-
-    .signature-date {
+    .sig-date-row {
+      margin-top: 16mm;
       display: flex;
       align-items: baseline;
-      justify-content: flex-end;
-      width: 100mm;
-      margin-left: auto !important;
-      margin-top: calc(3 * 1.4em) !important;
+      justify-content: center;
       white-space: nowrap;
     }
 
-    .signature-date-spacer {
+    .date-slot {
       display: inline-block;
-      flex: 0 0 7ch;
-      width: 7ch;
-      height: 1.4em;
-      box-sizing: border-box;
+      width: 14mm;
       border-bottom: 1px dotted #000;
+      margin: 0 1.5mm;
     }
 
-    .signature-date-rule {
-      display: flex;
-      align-items: baseline;
-      flex: 0 0 auto;
+    .order-block {
+      margin-top: 10mm;
+      text-align: center;
+      font-size: 16pt;
       line-height: 1.4;
     }
 
-    .signature-date-label {
-      flex: 0 0 auto;
-      padding-left: 1mm;
+    .auth-sig-block {
+      margin-top: 8mm;
+      margin-left: 38%;
+      width: 62%;
     }
 
-    @media screen {
-      body {
-        background: #f1f5f9;
-      }
+    .auth-sig-block .sig-row {
+      display: flex;
+      align-items: baseline;
+      width: 100%;
+    }
 
-      .a4-page {
-        background: #fff;
-        box-shadow: 0 2mm 8mm rgb(15 23 42 / 12%);
-      }
+    .text-center {
+      text-align: center;
+    }
+
+    .text-left {
+      text-align: left;
     }
 
     @media print {
-      html,
-      body {
+      html, body {
         width: 210mm;
         height: 297mm;
-      }
-
-      .a4-page {
-        margin: 0;
-        box-shadow: none;
-        break-after: avoid-page;
+        background: #fff !important;
+        margin: 0 !important;
+        padding: 0 !important;
       }
 
       .no-print {
         display: none !important;
       }
+
+      .a4-container {
+        padding: 0 !important;
+        margin: 0 !important;
+      }
+
+      .a4-page {
+        width: 210mm !important;
+        height: 297mm !important;
+        max-height: 297mm !important;
+        margin: 0 !important;
+        padding: 18mm 20mm 16mm 25mm !important;
+        box-shadow: none !important;
+        border: none !important;
+        break-after: avoid-page !important;
+        page-break-after: avoid !important;
+      }
     }
   </style>
 </head>
 <body>
-  <main class="a4-page">
-    <div class="form-number">แบบ ๓</div>
-    <h1 class="title">ใบขออนุมัติใช้รถส่วนกลาง</h1>
+  <div class="toolbar no-print">
+    <div class="toolbar-info">
+      <span class="toolbar-badge">A4 Portrait</span>
+      <span>แบบ ๓ ใบขออนุญาตใช้รถส่วนกลาง</span>
+    </div>
+    <div class="toolbar-actions">
+      <button class="btn btn-primary" onclick="window.print()">
+        🖨️ พิมพ์เอกสาร (Print / PDF)
+      </button>
+      <button class="btn btn-secondary" onclick="window.close()">
+        ✕ ปิด
+      </button>
+    </div>
+  </div>
 
-    <p class="request-date">
-      วันที่ <span class="date-field">${requestedOn.day}</span>
-      เดือน <span class="date-field month">${requestedOn.month}</span>
-      พ.ศ. <span class="date-field year">${requestedOn.year}</span>
-    </p>
+  <div class="a4-container">
+    <main class="a4-page">
+      <div class="form-number">แบบ ๓</div>
+      <h1 class="form-title">ใบขออนุญาตใช้รถส่วนกลาง</h1>
 
-    <p class="recipient">เรียน&nbsp;&nbsp;${printable(selectedRecipient)}</p>
+      <div class="top-date-row">
+        <span class="row-label">วันที่</span>
+        <span class="dotted-field text-center" style="width: 14mm;">${requestedOn.day || '&nbsp;'}</span>
+        <span class="row-label" style="margin-left: 6px;">เดือน</span>
+        <span class="dotted-field text-center" style="width: 28mm;">${requestedOn.month || '&nbsp;'}</span>
+        <span class="row-label" style="margin-left: 6px;">พ.ศ.</span>
+        <span class="dotted-field text-center" style="width: 18mm;">${requestedOn.year || '&nbsp;'}</span>
+      </div>
 
-    <section class="details">
-      <p class="detail-row requester-identity">
-        <span class="requester-name-group">
-          <span>ชื่อหน่วย / บริการส่วนงาน</span><span class="field-line requester-name-line">${requesterDepartment}</span>
-        </span>
-        <span class="requester-position-group">
-          <span>ประเภท / จำนวน</span><span class="field-line requester-position-line">${carType} / ${passengerCount} คน</span>
-        </span>
-      </p>
-      <p class="detail-row destination-row">
-        <span>ขออนุมัติใช้รถ (ไปเรียน)</span>
-        <span class="field-line destination-line">${destination}${province}</span>
-      </p>
-      <p class="detail-row purpose-row">
-        <span>เหตุที่ต้องการรถ</span>
-        <span class="field-line purpose-line">${purpose}</span>
-      </p>
-      <p class="detail-row travel-row">
-        <span>เริ่มต้น</span>
-        <span class="field-line travel-date-line">${startsAt.day}&nbsp;${startsAt.month}&nbsp;${startsAt.year}</span>
-        <span>เวลา</span>
-        <span class="field-line travel-time-line">${startsAt.time}</span>
-        <span>น.</span>
-      </p>
-      <p class="detail-row travel-row">
-        <span>ถึง</span>
-        <span class="field-line travel-date-line">${endsAt.day}&nbsp;${endsAt.month}&nbsp;${endsAt.year}</span>
-        <span>เวลา</span>
-        <span class="field-line travel-time-line">${endsAt.time}</span>
-        <span>น.</span>
-      </p>
-    </section>
+      <div class="form-row" style="margin-bottom: 2mm;">
+        <span class="row-label">เรียน</span>
+        <span class="row-label" style="margin-left: 10px;">${printable(selectedRecipient)}</span>
+      </div>
 
-    <section class="signature requester-signature">
-      <p class="signature-line">(ลงชื่อ)............................................................ผู้ขออนุญาต</p>
-      <p>(${requesterName})</p>
-      <p>${requesterPosition}</p>
-      <p>${requesterDepartment}</p>
-    </section>
+      <div class="form-row indent-gov">
+        <span class="row-label">ข้าพเจ้า</span>
+        <span class="dotted-fill text-center" style="flex: 1.1;">${requesterName || '&nbsp;'}</span>
+        <span class="row-label" style="margin-left: 8px;">ตำแหน่ง</span>
+        <span class="dotted-fill text-center" style="flex: 1;">${requesterPosition || '&nbsp;'}</span>
+      </div>
 
-    <section class="vehicle">
-      <p class="vehicle-row">
-        <span>รถยนต์</span>
-        <span class="field-line vehicle-type-line">${carType}</span>
-        <span>หมายเลขทะเบียน</span>
-        <span class="field-line license-plate-line">${carPlate}</span>
-      </p>
-      <p class="driver-row vehicle-row">
-        <span>พนักงานขับรถยนต์</span>
-        <span class="field-line license-plate-line">${driverName}</span>
-      </p>
-    </section>
+      <div class="form-row">
+        <span class="row-label">ขออนุญาตใช้รถ (ไปที่ไหน)</span>
+        <span class="dotted-fill text-left">${destLine1 || '&nbsp;'}</span>
+      </div>
 
-    <section class="signature review-signature">
-      <p class="signature-line">
-        <span>ลงชื่อ</span><span class="signature-leader"></span><span>หัวหน้าฝ่ายหรือผู้แทน</span>
-      </p>
-      <p class="signature-date">
-        <span class="signature-date-rule">
-          <span class="signature-date-spacer"></span><span>/</span><span class="signature-date-spacer"></span><span>/</span>
-          <span class="signature-date-spacer"></span>
-        </span>
-        <span class="signature-date-label">(วัน เดือน ปี)</span>
-      </p>
-    </section>
+      <div class="form-row">
+        <span class="dotted-fill text-left">${destLine2 || '&nbsp;'}</span>
+      </div>
 
-    <p class="approval-order">อนุญาต และพนักงานขับรถยนต์จัดทำแบบรายงานการใช้รถ (แบบ ๔) ให้เรียบร้อยด้วย</p>
+      <div class="form-row">
+        <span class="row-label">เพื่อ</span>
+        <span class="dotted-fill text-left">${purposeLine1 || '&nbsp;'}</span>
+      </div>
 
-    <section class="signature authority-signature">
-      <p class="signature-line">
-        <span>(ลงนามผู้มีอำนาจสั่งใช้รถ)</span><span class="signature-leader"></span>
-      </p>
-      <p class="signature-date">
-        <span class="signature-date-rule">
-          <span class="signature-date-spacer"></span><span>/</span><span class="signature-date-spacer"></span><span>/</span>
-          <span class="signature-date-spacer"></span>
-        </span>
-        <span class="signature-date-label">(วัน เดือน ปี)</span>
-      </p>
-    </section>
-  </main>
+      <div class="form-row">
+        <span class="dotted-fill text-left">${purposeLine2 || '&nbsp;'}</span>
+        <span class="row-label" style="margin-left: 8px;">มีคนนั่ง</span>
+        <span class="dotted-field text-center" style="width: 16mm;">${passengerCount || '&nbsp;'}</span>
+        <span class="row-label" style="margin-left: 6px;">คน</span>
+      </div>
+
+      <div class="form-row">
+        <span class="row-label">ในวันที่</span>
+        <span class="dotted-fill text-center">${startDateStr || '&nbsp;'}</span>
+        <span class="row-label" style="margin-left: 8px;">เวลา</span>
+        <span class="dotted-field text-center" style="width: 22mm;">${startsAt.time || '&nbsp;'}</span>
+        <span class="row-label" style="margin-left: 6px;">น.</span>
+      </div>
+
+      <div class="form-row">
+        <span class="row-label">ถึงวันที่</span>
+        <span class="dotted-fill text-center">${endDateStr || '&nbsp;'}</span>
+        <span class="row-label" style="margin-left: 8px;">เวลา</span>
+        <span class="dotted-field text-center" style="width: 22mm;">${endsAt.time || '&nbsp;'}</span>
+        <span class="row-label" style="margin-left: 6px;">น.</span>
+      </div>
+
+      <div class="requester-sig-block">
+        <span class="dotted-line" style="width: 60mm;">&nbsp;</span>
+        <span class="row-label" style="margin-left: 6px;">ผู้ขออนุญาต</span>
+      </div>
+
+      <div class="form-row" style="margin-top: 12mm;">
+        <span class="row-label">รถยนต์</span>
+        <span class="dotted-field text-center" style="width: 36mm;">${carType || '-'}</span>
+        <span class="row-label" style="margin-left: 8px;">หมายเลขทะเบียน</span>
+        <span class="dotted-fill text-center">${carPlate || '&nbsp;'}</span>
+      </div>
+
+      <div class="form-row">
+        <span class="row-label">พนักงานขับรถยนต์</span>
+        <span class="dotted-fill text-center">${driverName || '&nbsp;'}</span>
+      </div>
+
+      <div class="head-sig-block">
+        <div class="sig-row">
+          <span class="row-label">ลงชื่อ</span>
+          <span class="dotted-line" style="flex: 1;">&nbsp;</span>
+          <span class="row-label" style="margin-left: 4px;">หัวหน้าฝ่ายหรือผู้แทน</span>
+        </div>
+        <div class="sig-date-row">
+          <span class="date-slot">&nbsp;</span>/
+          <span class="date-slot">&nbsp;</span>/
+          <span class="date-slot">&nbsp;</span>
+          <span class="row-label" style="margin-left: 4px;">(วัน เดือน ปี)</span>
+        </div>
+      </div>
+
+      <div class="order-block">
+        อนุญาต และพนักงานขับรถยนต์จัดทำแบบรายงานการใช้รถ (แบบ ๔) ให้เรียบร้อยด้วย
+      </div>
+
+      <div class="auth-sig-block">
+        <div class="sig-row">
+          <span class="row-label">(ลงนามผู้มีอำนาจสั่งใช้รถ)</span>
+          <span class="dotted-line" style="flex: 1;">&nbsp;</span>
+        </div>
+        <div class="sig-date-row">
+          <span class="date-slot">&nbsp;</span>/
+          <span class="date-slot">&nbsp;</span>/
+          <span class="date-slot">&nbsp;</span>
+          <span class="row-label" style="margin-left: 4px;">(วัน เดือน ปี)</span>
+        </div>
+      </div>
+    </main>
+  </div>
 </body>
 </html>`
 }
