@@ -2,7 +2,7 @@
 
 @font-face {
   font-family: 'TH Sarabun IT9';
-  src: url('/fonts/THSarabunIT9-Regular.ttf') format('truetype');
+  src: url('./assets/fonts/THSarabunIT9-Regular.ttf') format('truetype');
   font-weight: normal;
   font-style: normal;
   font-display: swap;
@@ -10,7 +10,7 @@
 
 @font-face {
   font-family: 'TH Sarabun IT9';
-  src: url('/fonts/THSarabunIT9-Bold.ttf') format('truetype');
+  src: url('./assets/fonts/THSarabunIT9-Bold.ttf') format('truetype');
   font-weight: bold;
   font-style: normal;
   font-display: swap;
@@ -18,7 +18,7 @@
 
 @font-face {
   font-family: 'TH Sarabun IT9';
-  src: url('/fonts/THSarabunIT9-Italic.ttf') format('truetype');
+  src: url('./assets/fonts/THSarabunIT9-Italic.ttf') format('truetype');
   font-weight: normal;
   font-style: italic;
   font-display: swap;
@@ -26,30 +26,14 @@
 
 @font-face {
   font-family: 'TH Sarabun IT9';
-  src: url('/fonts/THSarabunIT9-BoldItalic.ttf') format('truetype');
+  src: url('./assets/fonts/THSarabunIT9-BoldItalic.ttf') format('truetype');
   font-weight: bold;
   font-style: italic;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: 'TH Sarabun IT๙';
-  src: url('/fonts/THSarabunIT9-Regular.ttf') format('truetype');
-  font-weight: normal;
-  font-style: normal;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: 'TH Sarabun IT๙';
-  src: url('/fonts/THSarabunIT9-Bold.ttf') format('truetype');
-  font-weight: bold;
-  font-style: normal;
   font-display: swap;
 }
 
 @theme {
-  --font-sans: "TH Sarabun IT9", "TH Sarabun IT๙", "TH Sarabun New", "TH SarabunPSK", "Sarabun", system-ui, sans-serif;
+  --font-sans: "Sarabun", system-ui, sans-serif;
 
   --color-brand-50: #ecfdf5;
   --color-brand-100: #d1fae5;
@@ -65,14 +49,14 @@
 
 html {
   scroll-behavior: smooth;
-  font-family: "TH Sarabun IT9", "TH Sarabun IT๙", "TH Sarabun New", "TH SarabunPSK", "Sarabun", system-ui, sans-serif;
+  font-family: var(--font-sans);
 }
 
 body {
   margin: 0;
   background-color: #f8fafc;
   color: #1e293b;
-  font-family: "TH Sarabun IT9", "TH Sarabun IT๙", "TH Sarabun New", "TH SarabunPSK", "Sarabun", system-ui, sans-serif;
+  font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
 }
 

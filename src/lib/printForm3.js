@@ -1,4 +1,8 @@
 import html2pdf from 'html2pdf.js'
+import fontRegularUrl from '../assets/fonts/THSarabunIT9-Regular.ttf'
+import fontBoldUrl from '../assets/fonts/THSarabunIT9-Bold.ttf'
+import fontItalicUrl from '../assets/fonts/THSarabunIT9-Italic.ttf'
+import fontBoldItalicUrl from '../assets/fonts/THSarabunIT9-BoldItalic.ttf'
 import {
   bangkokParts,
   carTypeDisplay,
@@ -149,44 +153,30 @@ export function generateForm3Html(request, car, driver, recipient) {
   <style>
     @font-face {
       font-family: 'TH Sarabun IT9';
-      src: url('/fonts/THSarabunIT9-Regular.ttf') format('truetype');
+      src: url(${fontRegularUrl}) format('truetype');
       font-weight: normal;
       font-style: normal;
       font-display: swap;
     }
     @font-face {
       font-family: 'TH Sarabun IT9';
-      src: url('/fonts/THSarabunIT9-Bold.ttf') format('truetype');
+      src: url(${fontBoldUrl}) format('truetype');
       font-weight: bold;
       font-style: normal;
       font-display: swap;
     }
     @font-face {
       font-family: 'TH Sarabun IT9';
-      src: url('/fonts/THSarabunIT9-Italic.ttf') format('truetype');
+      src: url(${fontItalicUrl}) format('truetype');
       font-weight: normal;
       font-style: italic;
       font-display: swap;
     }
     @font-face {
       font-family: 'TH Sarabun IT9';
-      src: url('/fonts/THSarabunIT9-BoldItalic.ttf') format('truetype');
+      src: url(${fontBoldItalicUrl}) format('truetype');
       font-weight: bold;
       font-style: italic;
-      font-display: swap;
-    }
-    @font-face {
-      font-family: 'TH Sarabun IT๙';
-      src: url('/fonts/THSarabunIT9-Regular.ttf') format('truetype');
-      font-weight: normal;
-      font-style: normal;
-      font-display: swap;
-    }
-    @font-face {
-      font-family: 'TH Sarabun IT๙';
-      src: url('/fonts/THSarabunIT9-Bold.ttf') format('truetype');
-      font-weight: bold;
-      font-style: normal;
       font-display: swap;
     }
 
