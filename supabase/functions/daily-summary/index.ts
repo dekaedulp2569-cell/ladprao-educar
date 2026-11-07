@@ -1,13 +1,14 @@
 // Supabase Edge Function: daily-summary
-// สรุปงานของวันถัดไป เวลา 16:00 น. (Asia/Bangkok)
-// ส่งเข้ากลุ่ม LINE เริ่มต้น + คนขับรถ + ผู้ที่เกี่ยวข้อง + ผู้ขอใช้รถ
+// โหมดรายวัน: ส่งเวลา 15:30 น. (สรุปงานพรุ่งนี้)
+// โหมดรายสัปดาห์: ส่งวันอาทิตย์ 14:00 น. (สรุปจันทร์-อาทิตย์สัปดาห์ถัดไป แยกตามคนขับ)
 //
-// ต้องตั้งค่า secrets:
+// ตั้งค่า secrets:
 //   LINE_CHANNEL_ACCESS_TOKEN, LINE_GROUP_ID (ตัวสำรอง), CRON_SECRET (แนะนำ)
 //   SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY (มีให้อัตโนมัติใน Edge Function)
 //
-// ตั้งเวลาเรียกด้วย pg_cron + pg_net (09:00 UTC = 16:00 Asia/Bangkok)
-// ดูตัวอย่างใน supabase/functions/README.md
+// pg_cron:
+//   daily-summary:  '30 8 * * *'  (08:30 UTC = 15:30 เวลาไทย)
+//   weekly-summary: '0 7 * * 0'   (07:00 UTC = 14:00 เวลาไทย วันอาทิตย์)
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import {
@@ -15,13 +16,14 @@ import {
   carTypeLabel,
   corsHeaders,
   formatThaiDate,
+  formatThaiTime,
   json,
   pushFlex,
   resolveGroupId,
 } from '../_shared/line.ts'
 
 const BANGKOK_OFFSET_MINUTES = 7 * 60
-const SUMMARY_COLOR = '#0284C7'
+const SUMMARY_COLOR = '#0284C7' // 🔵 สีฟ้า-น้ำเงิน สำหรับสรุปงาน
 
 function bangkokDateKey(date: Date) {
   const local = new Date(date.getTime() + BANGKOK_OFFSET_MINUTES * 60 * 1000)
@@ -48,8 +50,8 @@ function summaryContents(title: string, lines: string[], color: string) {
           contents: [
             {
               type: 'text',
-              text: 'EduLP Car • สรุปงานประจำวัน (16:00 น.)',
-              color: '#D1FAE5',
+              text: 'EduLP Car • สรุปงานประจำวัน (15:30 น.)',
+              color: '#E0F2FE',
               size: 'sm',
               weight: 'bold',
               wrap: true,
@@ -72,8 +74,8 @@ function summaryContents(title: string, lines: string[], color: string) {
             : [
                 {
                   type: 'text',
-                  text: 'ไม่มีรายการที่ได้รับอนุมัติสำหรับวันพรุ่งนี้',
-                  size: 'md',
+                  text: 'ไม่มีรายการที่ได้รับอนุมัติ',
+                  size: 'sm',
                   color: '#4B5563',
                   wrap: true,
                 },
@@ -83,6 +85,54 @@ function summaryContents(title: string, lines: string[], color: string) {
     }
     return cards.length === 1 ? cards[0] : { type: 'carousel', contents: cards }
   })
+}
+
+function weeklySummaryContents(title: string, driverGroups: Map<string, string[]>, color: string) {
+  const cards: Record<string, unknown>[] = []
+  for (const [driverName, lines] of driverGroups) {
+    cards.push({
+      type: 'bubble',
+      styles: { header: { backgroundColor: color } },
+      header: {
+        type: 'box',
+        layout: 'vertical',
+        contents: [
+          {
+            type: 'text',
+            text: 'EduLP Car • สรุปรายสัปดาห์ (อาทิตย์ 14:00 น.)',
+            color: '#E0F2FE',
+            size: 'sm',
+            weight: 'bold',
+            wrap: true,
+          },
+          { type: 'text', text: `🚙 ${driverName}`, color: '#FFFFFF', size: 'md', weight: 'bold', wrap: true },
+        ],
+      },
+      body: {
+        type: 'box',
+        layout: 'vertical',
+        spacing: 'sm',
+        contents: lines.length
+          ? lines.map((line) => ({
+              type: 'text',
+              text: line,
+              size: 'sm',
+              color: '#374151',
+              wrap: true,
+            }))
+          : [
+              {
+                type: 'text',
+                text: 'ไม่มีงานในสัปดาห์นี้',
+                size: 'sm',
+                color: '#4B5563',
+                wrap: true,
+              },
+            ],
+      },
+    })
+  }
+  return cards.length === 1 ? cards[0] : { type: 'carousel', contents: cards }
 }
 
 type Recipient = { label: string; lines: string[] }
@@ -132,7 +182,135 @@ Deno.serve(async (req) => {
     auth: { persistSession: false },
   })
 
-  // งานของ "พรุ่งนี้" ตามเวลาไทย
+  // อ่านพารามิเตอร์จาก body (สำหรับ weekly mode)
+  let isWeekly = false
+  try {
+    const body = await req.json()
+    isWeekly = body?.weekly === true
+  } catch {
+    // ไม่มี body หรือไม่ใช่ JSON ใช้ค่าเริ่มต้น isWeekly = false
+  }
+
+  const [{ data: cars, error: carsError }, { data: drivers, error: driversError }] =
+    await Promise.all([
+      supabase.from('cars').select('*'),
+      supabase.from('user_profiles').select('*').eq('role', 'driver'),
+    ])
+  if (carsError || driversError) {
+    return json({ error: 'Unable to load vehicle and driver details' }, 500)
+  }
+
+  const carById = new Map((cars || []).map((car) => [car.id, car]))
+  const driverById = new Map((drivers || []).map((driver) => [driver.id, driver]))
+
+  if (isWeekly) {
+    // ==========================================
+    // โหมดรายสัปดาห์: สรุปจันทร์-อาทิตย์สัปดาห์ถัดไป
+    // ==========================================
+    const now = new Date()
+    const nowBkk = new Date(now.getTime() + BANGKOK_OFFSET_MINUTES * 60 * 1000)
+
+    // หาวันจันทร์ของสัปดาห์ถัดไป (สัปดาห์เริ่มวันจันทร์)
+    const nextMonday = new Date(nowBkk)
+    nextMonday.setDate(nextMonday.getDate() + ((7 - nextMonday.getDay() + 1) % 7 || 7))
+    nextMonday.setHours(0, 0, 0, 0)
+
+    // หาวันอาทิตย์ของสัปดาห์ถัดไป
+    const nextSunday = new Date(nextMonday)
+    nextSunday.setDate(nextSunday.getDate() + 6)
+    nextSunday.setHours(23, 59, 59, 999)
+
+    const weekStart = nextMonday.toISOString()
+    const weekEnd = nextSunday.toISOString()
+
+    const { data: jobs, error } = await supabase
+      .from('car_requests')
+      .select('*')
+      .eq('status', 'approved')
+      .gte('start_datetime', weekStart)
+      .lte('start_datetime', weekEnd)
+      .order('start_datetime', { ascending: true })
+
+    if (error) return json({ error: error.message }, 500)
+
+    // จัดกลุ่มงานตามคนขับ
+    const driverGroups = new Map<string, string[]>()
+    const unassignedJobs: string[] = []
+
+    for (let i = 0; i < (jobs || []).length; i += 1) {
+      const job = jobs[i]
+      const driver = job.assigned_driver_id ? driverById.get(job.assigned_driver_id) : null
+      const car = job.assigned_car_id ? carById.get(job.assigned_car_id) : null
+      const carLabel = car
+        ? `${car.license_plate} (${carTypeLabel(car.car_type)})`
+        : job.external_car_info || 'ไม่ระบุรถ'
+      const driverLabel = driver
+        ? `${driver.nickname ? driver.nickname + ' - ' : ''}${driver.full_name}`
+        : 'ยังไม่ระบุคนขับ'
+
+      const missionText = buildMissionText({
+        index: i + 1,
+        request: job as Record<string, unknown>,
+        carLabel,
+        driverLabel,
+      })
+
+      const groupKey = driverLabel
+      if (!driverGroups.has(groupKey)) {
+        driverGroups.set(groupKey, [])
+      }
+      driverGroups.get(groupKey)!.push(missionText)
+    }
+
+    // คนขับที่ไม่มีงานในสัปดาห์นี้ ก็ยังแสดงการ์ดว่าไม่มีงาน
+    for (const [driverId, driver] of driverById) {
+      const driverLabel = `${driver.nickname ? driver.nickname + ' - ' : ''}${driver.full_name}`
+      if (!driverGroups.has(driverLabel)) {
+        driverGroups.set(driverLabel, [])
+      }
+    }
+
+    const results: unknown[] = []
+    const lineGroupId = await resolveGroupId(supabase)
+
+    const dayLabel = formatThaiDate(nextMonday)
+    const endDayLabel = formatThaiDate(nextSunday)
+
+    for (const contents of weeklySummaryContents(
+      `สรุปงานรายสัปดาห์ ${dayLabel} - ${endDayLabel}`,
+      driverGroups,
+      SUMMARY_COLOR,
+    )) {
+      results.push(
+        await pushFlex(
+          lineGroupId,
+          `สรุปตารางงานรายสัปดาห์ ${dayLabel} ถึง ${endDayLabel}`,
+          contents,
+        ),
+      )
+    }
+
+    const failed = results.some(
+      (result) => typeof result === 'object' && result !== null && 'ok' in result && !result.ok,
+    )
+
+    return json(
+      {
+        type: 'weekly',
+        weekStart,
+        weekEnd,
+        jobs: jobs?.length || 0,
+        driverGroups: driverGroups.size,
+        groupConfigured: Boolean(lineGroupId),
+        results,
+      },
+      failed ? 502 : 200,
+    )
+  }
+
+  // ==========================================
+  // โหมดรายวัน: สรุปงานพรุ่งนี้ (เดิม)
+  // ==========================================
   const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000)
   const dayKey = bangkokDateKey(tomorrow)
   const dayStart = new Date(`${dayKey}T00:00:00+07:00`)
@@ -148,19 +326,6 @@ Deno.serve(async (req) => {
 
   if (error) return json({ error: error.message }, 500)
 
-  const [{ data: cars, error: carsError }, { data: drivers, error: driversError }] =
-    await Promise.all([
-      supabase.from('cars').select('*'),
-      supabase.from('user_profiles').select('*').eq('role', 'driver'),
-    ])
-  if (carsError || driversError) {
-    return json({ error: 'Unable to load vehicle and driver details' }, 500)
-  }
-
-  const carById = new Map((cars || []).map((car) => [car.id, car]))
-  const driverById = new Map((drivers || []).map((driver) => [driver.id, driver]))
-
-  // รวมผู้รับเป็นรายคน เพื่อไม่ให้ส่งซ้ำเมื่อคนเดียวมีหลายบทบาท
   const personal = new Map<string, Recipient>()
   const groupLines: string[] = []
 
@@ -245,6 +410,7 @@ Deno.serve(async (req) => {
 
   return json(
     {
+      type: 'daily',
       date: dayKey,
       jobs: jobs?.length || 0,
       personalRecipients: personal.size,

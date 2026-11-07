@@ -152,8 +152,10 @@ export function generateForm3Html(request, car, driver, recipient) {
       min-width: 0;
       padding: 0 1mm 0.5mm;
       border-bottom: 1px dotted #000;
-      text-align: center;
-      white-space: nowrap;
+      text-align: left;
+      /* อนุญาตให้ข้อความยาวขึ้นบรรทัดใหม่ได้ */
+      white-space: normal;
+      word-break: break-word;
     }
 
     .destination-row,
@@ -163,7 +165,8 @@ export function generateForm3Html(request, car, driver, recipient) {
       display: flex;
       align-items: baseline;
       gap: 1mm;
-      white-space: nowrap;
+      /* อนุญาตให้ข้อความยาวขึ้นบรรทัดใหม่ได้ */
+      flex-wrap: wrap;
     }
 
     .destination-line,
@@ -190,7 +193,8 @@ export function generateForm3Html(request, car, driver, recipient) {
       align-items: baseline;
       gap: 1mm;
       padding-left: 20mm;
-      white-space: nowrap;
+      /* อนุญาตให้ข้อความยาวขึ้นบรรทัดใหม่ได้ */
+      flex-wrap: wrap;
     }
 
     .requester-name-group,
