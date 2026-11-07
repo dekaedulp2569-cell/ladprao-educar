@@ -239,7 +239,7 @@ export function generateForm3Html(request, car, driver, recipient) {
 
     /* ส่วนลายเซ็นผู้ขออนุญาต: เว้น 1 บรรทัด, ชื่อในวงเล็บ, ตำแหน่ง, สังกัด อยู่กึ่งกลางเส้นประ (ไม่มีเส้นประใต้ตำแหน่ง/สังกัด) */
     .requester-sig-block {
-      margin-top: 7mm;
+      margin-top: 8mm;
       display: flex; justify-content: flex-end; width: 100%;
     }
     .requester-sig-col {
@@ -254,10 +254,10 @@ export function generateForm3Html(request, car, driver, recipient) {
       text-align: center; margin-top: 0.5mm; line-height: 1.3;
     }
 
-    /* หัวหน้าฝ่าย: เว้น 3 บรรทัดก่อนวันเดือนปี และวันเดือนปีอยู่กึ่งกลางเส้นประพอดี */
+    /* หัวหน้าฝ่าย: เว้น 3 บรรทัดห่างๆ ก่อนวันเดือนปี และวันเดือนปีอยู่กึ่งกลางเส้นประพอดี */
     .head-sig-block {
       margin-top: 8mm; margin-left: 42%; width: 58%;
-      position: relative; min-height: 23mm;
+      position: relative; min-height: 30mm;
     }
     .head-sig-block .sig-row {
       display: flex; align-items: baseline; width: 100%;
@@ -276,7 +276,7 @@ export function generateForm3Html(request, car, driver, recipient) {
     }
     .sig-date-centered {
       position: absolute;
-      top: 14mm;
+      top: 22mm;
       left: 50%;
       transform: translateX(-50%);
       display: flex;
@@ -294,10 +294,10 @@ export function generateForm3Html(request, car, driver, recipient) {
       font-size: 16pt; line-height: 1.4; font-weight: 700;
     }
 
-    /* ผู้มีอำนาจสั่งใช้รถ: เว้น 3 บรรทัดก่อนวันเดือนปี และวันเดือนปีอยู่กึ่งกลางเส้นประพอดี */
+    /* ผู้มีอำนาจสั่งใช้รถ: เว้น 3 บรรทัดห่างๆ ก่อนวันเดือนปี และวันเดือนปีอยู่กึ่งกลางเส้นประพอดี */
     .auth-sig-block {
       margin-top: 8mm; margin-left: 36%; width: 64%;
-      position: relative; min-height: 23mm;
+      position: relative; min-height: 30mm;
     }
     .auth-sig-block .sig-row {
       display: flex; align-items: baseline; width: 100%;
