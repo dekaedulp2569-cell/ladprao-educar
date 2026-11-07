@@ -1369,7 +1369,7 @@ function ResourcesPanel({ cars, drivers, onReload, onError }) {
       </Card>
 
       <Card className="p-5">
-        <SectionTitle title="พนักงานขับรถ" subtitle={`ทั้งหมด ${drivers.length} คน (เพิ่ม / ลบ / แก้ไข ได้)`} />
+        <SectionTitle title="พนักงานขับรถ" subtitle={`ทั้งหมด ${drivers.length} คน (จัดการได้ที่หน้าจัดการสมาชิก)`} />
         <div className="space-y-2">
           {drivers.length === 0 ? (
             <p className="rounded-xl bg-slate-50 px-4 py-6 text-center text-sm text-slate-500">ยังไม่มีข้อมูลคนขับ</p>
@@ -1384,7 +1384,7 @@ function ResourcesPanel({ cars, drivers, onReload, onError }) {
                     {driver.full_name}{driver.nickname ? ` (${driver.nickname})` : ''}
                   </p>
                   <p className="text-xs text-slate-500">
-                    {driver.dept === 'education' ? 'ฝ่ายเรา' : 'ฝ่ายอื่น'} ·{' '}
+                    {driver.driver_dept_type === 'education' ? 'ฝ่ายเรา' : 'ฝ่ายอื่น'} ·{' '}
                     {driver.line_user_id ? 'ผูก LINE แล้ว' : 'ยังไม่ผูก LINE'}
                   </p>
                 </div>
@@ -1394,12 +1394,12 @@ function ResourcesPanel({ cars, drivers, onReload, onError }) {
                     onClick={() => toggleDriver(driver)}
                     disabled={busy}
                     className={`rounded-lg px-2 py-1 text-xs font-medium ${
-                      driver.is_active
+                      driver.status === 'active'
                         ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
                         : 'bg-slate-100 text-slate-500 border border-slate-200'
                     }`}
                   >
-                    {driver.is_active ? 'พร้อม' : 'ปิด'}
+                    {driver.status === 'active' ? 'พร้อม' : 'ปิด'}
                   </button>
                   <button
                     type="button"
@@ -1420,46 +1420,10 @@ function ResourcesPanel({ cars, drivers, onReload, onError }) {
             ))
           )}
         </div>
-
-        <form onSubmit={addDriver} className="mt-4 space-y-3 rounded-xl bg-brand-50/60 p-4">
-          <p className="text-sm font-semibold text-brand-800">➕ เพิ่มพนักงานขับรถ</p>
-          <div className="grid grid-cols-2 gap-2">
-            <input
-              required
-              value={driverForm.full_name}
-              onChange={(event) => setDriverForm({ ...driverForm, full_name: event.target.value })}
-              placeholder="ชื่อ-สกุล"
-              className={selectClass}
-            />
-            <input
-              value={driverForm.nickname}
-              onChange={(event) => setDriverForm({ ...driverForm, nickname: event.target.value })}
-              placeholder="ชื่อเล่น"
-              className={selectClass}
-            />
-            <select
-              value={driverForm.dept}
-              onChange={(event) => setDriverForm({ ...driverForm, dept: event.target.value })}
-              className={selectClass}
-            >
-              <option value="education">คนขับฝ่ายเรา</option>
-              <option value="external">คนขับฝ่ายอื่น</option>
-            </select>
-            <input
-              value={driverForm.line_user_id}
-              onChange={(event) => setDriverForm({ ...driverForm, line_user_id: event.target.value })}
-              placeholder="LINE User ID (ถ้ามี)"
-              className={selectClass}
-            />
-          </div>
-          <button
-            type="submit"
-            disabled={busy}
-            className="w-full rounded-xl bg-brand-700 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-800 disabled:opacity-60"
-          >
-            บันทึกพนักงานขับรถ
-          </button>
-        </form>
+        <div className="mt-3 rounded-xl bg-brand-50 px-4 py-3 text-sm text-brand-800">
+          <p className="font-semibold">💡 การเพิ่มหรือแก้ไขข้อมูลคนขับ</p>
+          <p className="text-xs mt-1">กรุณาไปที่หน้า <b>จัดการสมาชิก</b> เพื่อเพิ่ม แก้ไข หรือลบพนักงานขับรถ (เลือกบทบาทเป็น "พนักงานขับรถ")</p>
+        </div>
       </Card>
 
       {/* Modal แก้ไขข้อมูลรถ */}
