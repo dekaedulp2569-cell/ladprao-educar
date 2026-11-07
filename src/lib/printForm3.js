@@ -87,20 +87,21 @@ export function generateForm3Html(request, car, driver, recipient) {
       width: 210mm;
       min-height: 297mm;
       margin: 0 auto;
-      padding: 9mm 20mm 10mm 30mm;
-      font-size: 16pt;
+      padding: 8mm 15mm 10mm 15mm;
+      font-size: 14pt;
       font-weight: 400;
-      line-height: 1.16;
+      line-height: 1.2;
     }
 
     .form-number {
       text-align: right;
       font-weight: 700;
       line-height: 1;
+      margin-bottom: 3mm;
     }
 
     .title {
-      margin: 2mm 0 2mm;
+      margin: 3mm 0 4mm;
       text-align: center;
       font-size: 20pt;
       font-weight: 700;
@@ -111,40 +112,45 @@ export function generateForm3Html(request, car, driver, recipient) {
       display: flex;
       align-items: baseline;
       justify-content: flex-end;
-      gap: 1.5mm;
-      margin: 0 0 4mm;
+      gap: 1mm;
+      margin: 0 0 5mm;
       text-align: right;
       white-space: nowrap;
     }
 
     .date-field {
       display: inline-block;
-      min-width: 13mm;
+      min-width: 12mm;
       padding: 0 1mm 0.5mm;
       border-bottom: 1px dotted #000;
       text-align: center;
+      white-space: nowrap;
     }
 
     .date-field.month {
-      min-width: 27mm;
+      min-width: 26mm;
     }
 
     .date-field.year {
-      min-width: 22mm;
+      min-width: 20mm;
     }
 
     .recipient {
-      margin: 3mm 0;
+      margin: 0 0 5mm;
     }
 
     .details {
-      margin-top: 5mm;
+      margin-top: 6mm;
     }
 
     .detail-row {
-      min-height: 7.4mm;
+      min-height: 7mm;
       margin: 0;
       line-height: 1.3;
+      display: flex;
+      align-items: baseline;
+      gap: 1mm;
+      flex-wrap: wrap;
     }
 
     .field-line {
@@ -153,20 +159,8 @@ export function generateForm3Html(request, car, driver, recipient) {
       padding: 0 1mm 0.5mm;
       border-bottom: 1px dotted #000;
       text-align: left;
-      /* อนุญาตให้ข้อความยาวขึ้นบรรทัดใหม่ได้ */
       white-space: normal;
       word-break: break-word;
-    }
-
-    .destination-row,
-    .purpose-row,
-    .travel-row,
-    .vehicle-row {
-      display: flex;
-      align-items: baseline;
-      gap: 1mm;
-      /* อนุญาตให้ข้อความยาวขึ้นบรรทัดใหม่ได้ */
-      flex-wrap: wrap;
     }
 
     .destination-line,
@@ -193,8 +187,8 @@ export function generateForm3Html(request, car, driver, recipient) {
       align-items: baseline;
       gap: 1mm;
       padding-left: 20mm;
-      /* อนุญาตให้ข้อความยาวขึ้นบรรทัดใหม่ได้ */
       flex-wrap: wrap;
+      white-space: normal;
     }
 
     .requester-name-group,
@@ -275,7 +269,7 @@ export function generateForm3Html(request, car, driver, recipient) {
     }
 
     .approval-order {
-      margin: 14mm 0 0;
+      margin: 24mm 0 0;
       text-align: center;
       font-weight: 700;
     }
@@ -357,13 +351,17 @@ export function generateForm3Html(request, car, driver, recipient) {
         box-shadow: none;
         break-after: avoid-page;
       }
+
+      .no-print {
+        display: none !important;
+      }
     }
   </style>
 </head>
 <body>
   <main class="a4-page">
     <div class="form-number">แบบ ๓</div>
-    <h1 class="title">ใบขออนุญาตใช้รถส่วนกลาง</h1>
+    <h1 class="title">ใบขออนุมัติใช้รถส่วนกลาง</h1>
 
     <p class="request-date">
       วันที่ <span class="date-field">${requestedOn.day}</span>
@@ -376,32 +374,29 @@ export function generateForm3Html(request, car, driver, recipient) {
     <section class="details">
       <p class="detail-row requester-identity">
         <span class="requester-name-group">
-          <span>ข้าพเจ้า</span><span class="field-line requester-name-line">${requesterName}</span>
+          <span>ชื่อหน่วย / บริการส่วนงาน</span><span class="field-line requester-name-line">${requesterDepartment}</span>
         </span>
         <span class="requester-position-group">
-          <span>ตำแหน่ง</span><span class="field-line requester-position-line">${requesterPosition}</span>
+          <span>ประเภท / จำนวน</span><span class="field-line requester-position-line">${carType} / ${passengerCount} คน</span>
         </span>
       </p>
       <p class="detail-row destination-row">
-        <span>ขออนุญาตใช้รถ (ไปที่ไหน)</span>
+        <span>ขออนุมัติใช้รถ (ไปเรียน)</span>
         <span class="field-line destination-line">${destination}${province}</span>
       </p>
       <p class="detail-row purpose-row">
-        <span>เพื่อ</span>
+        <span>เหตุที่ต้องการรถ</span>
         <span class="field-line purpose-line">${purpose}</span>
-        <span>มีคนนั่ง</span>
-        <span class="field-line passenger-line">${passengerCount}</span>
-        <span>คน</span>
       </p>
       <p class="detail-row travel-row">
-        <span>ในวันที่</span>
+        <span>เริ่มต้น</span>
         <span class="field-line travel-date-line">${startsAt.day}&nbsp;${startsAt.month}&nbsp;${startsAt.year}</span>
         <span>เวลา</span>
         <span class="field-line travel-time-line">${startsAt.time}</span>
         <span>น.</span>
       </p>
       <p class="detail-row travel-row">
-        <span>ถึงวันที่</span>
+        <span>ถึง</span>
         <span class="field-line travel-date-line">${endsAt.day}&nbsp;${endsAt.month}&nbsp;${endsAt.year}</span>
         <span>เวลา</span>
         <span class="field-line travel-time-line">${endsAt.time}</span>
