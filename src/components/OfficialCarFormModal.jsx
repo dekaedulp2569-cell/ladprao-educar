@@ -232,7 +232,7 @@ export function OfficialCarFormModal({ open, onClose, request, car, driver }) {
                 (&nbsp;{requesterName || '............................................................'}&nbsp;)
               </div>
               <div
-                className={`text-center border-b border-dotted border-black mt-[0.5mm] leading-[1.3] ${
+                className={`text-center mt-[0.5mm] leading-[1.3] ${
                   requesterPosition.length > 25 ? 'text-[15pt]' : ''
                 }`}
                 style={{ width: '60mm', marginRight: '22mm' }}
@@ -240,7 +240,7 @@ export function OfficialCarFormModal({ open, onClose, request, car, driver }) {
                 {requesterPosition || '\u00A0'}
               </div>
               <div
-                className={`text-center border-b border-dotted border-black mt-[0.5mm] leading-[1.3] ${
+                className={`text-center mt-[0.5mm] leading-[1.3] ${
                   requesterDepartment.length > 25 ? 'text-[15pt]' : ''
                 }`}
                 style={{ width: '60mm', marginRight: '22mm' }}
@@ -274,22 +274,25 @@ export function OfficialCarFormModal({ open, onClose, request, car, driver }) {
             </span>
           </div>
 
-          {/* ลงชื่อหัวหน้าฝ่าย - เว้น 2 บรรทัดก่อน, 4 บรรทัดว่างสำหรับประทับตราและลงนาม, แล้ววันเดือนปี */}
-          <div className="mt-[8mm]" style={{ marginLeft: '42%', width: '58%' }}>
+          {/* ลงชื่อหัวหน้าฝ่าย - วันเดือนปีอยู่กึ่งกลางเส้นประลงนามพอดี */}
+          <div className="mt-[8mm] relative min-h-[27mm]" style={{ marginLeft: '42%', width: '58%' }}>
             <div className="flex items-baseline w-full">
               <span className="shrink-0 whitespace-nowrap">ลงชื่อ</span>
-              <div className="flex-1 flex flex-col items-center min-w-[50mm]">
-                <span className="w-full border-b border-dotted border-black inline-block" style={{ height: '1.2em' }}>
+              <div className="relative flex-1 flex items-baseline mx-[4px]">
+                <span className="w-full border-b border-dotted border-black block" style={{ height: '1.2em' }}>
                   {'\u00A0'}
                 </span>
-                <div className="flex items-baseline justify-center whitespace-nowrap mt-[18mm]">
+                <div
+                  className="absolute flex items-baseline justify-center whitespace-nowrap"
+                  style={{ top: '18mm', left: '50%', transform: 'translateX(-50%)' }}
+                >
                   <span className="inline-block border-b border-dotted border-black mx-[1.5mm]" style={{ width: '14mm' }}>{'\u00A0'}</span>/
                   <span className="inline-block border-b border-dotted border-black mx-[1.5mm]" style={{ width: '14mm' }}>{'\u00A0'}</span>/
                   <span className="inline-block border-b border-dotted border-black mx-[1.5mm]" style={{ width: '14mm' }}>{'\u00A0'}</span>
                   <span className="shrink-0 whitespace-nowrap ml-[4px]">(วัน เดือน ปี)</span>
                 </div>
               </div>
-              <span className="shrink-0 whitespace-nowrap ml-[6px]">หัวหน้าฝ่ายหรือผู้แทน</span>
+              <span className="shrink-0 whitespace-nowrap ml-[4px]">หัวหน้าฝ่ายหรือผู้แทน</span>
             </div>
           </div>
 
@@ -298,15 +301,18 @@ export function OfficialCarFormModal({ open, onClose, request, car, driver }) {
             อนุญาต และพนักงานขับรถยนต์จัดทำแบบรายงานการใช้รถ (แบบ ๔) ให้เรียบร้อยด้วย
           </div>
 
-          {/* ลงนามผู้มีอำนาจ - เว้น 2 บรรทัดก่อน, 4 บรรทัดว่างสำหรับประทับตราและลงนาม, แล้ววันเดือนปี */}
-          <div className="mt-[8mm]" style={{ marginLeft: '36%', width: '64%' }}>
+          {/* ลงนามผู้มีอำนาจ - วันเดือนปีอยู่กึ่งกลางเส้นประลงนามพอดี */}
+          <div className="mt-[8mm] relative min-h-[27mm]" style={{ marginLeft: '36%', width: '64%' }}>
             <div className="flex items-baseline w-full">
               <span className="shrink-0 whitespace-nowrap">(ลงนามผู้มีอำนาจสั่งใช้รถ)</span>
-              <div className="flex-1 flex flex-col items-center min-w-[50mm]">
-                <span className="w-full border-b border-dotted border-black inline-block" style={{ height: '1.2em' }}>
+              <div className="relative flex-1 flex items-baseline mx-[4px]">
+                <span className="w-full border-b border-dotted border-black block" style={{ height: '1.2em' }}>
                   {'\u00A0'}
                 </span>
-                <div className="flex items-baseline justify-center whitespace-nowrap mt-[18mm]">
+                <div
+                  className="absolute flex items-baseline justify-center whitespace-nowrap"
+                  style={{ top: '18mm', left: '50%', transform: 'translateX(-50%)' }}
+                >
                   <span className="inline-block border-b border-dotted border-black mx-[1.5mm]" style={{ width: '14mm' }}>{'\u00A0'}</span>/
                   <span className="inline-block border-b border-dotted border-black mx-[1.5mm]" style={{ width: '14mm' }}>{'\u00A0'}</span>/
                   <span className="inline-block border-b border-dotted border-black mx-[1.5mm]" style={{ width: '14mm' }}>{'\u00A0'}</span>

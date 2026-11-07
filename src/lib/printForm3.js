@@ -231,6 +231,7 @@ export function generateForm3Html(request, car, driver, recipient) {
       margin-left: 50%; margin-bottom: 1mm; min-height: 7mm;
     }
 
+    /* ส่วนลายเซ็นผู้ขออนุญาต: ชื่อในวงเล็บ, ตำแหน่ง, สังกัด อยู่กึ่งกลางเส้นประ (ไม่มีเส้นประใต้ตำแหน่ง/สังกัด) */
     .requester-sig-block {
       margin-top: 4mm;
       display: flex; justify-content: flex-end; width: 100%;
@@ -247,25 +248,35 @@ export function generateForm3Html(request, car, driver, recipient) {
       text-align: center; margin-top: 0.5mm; line-height: 1.3;
     }
 
+    /* หัวหน้าฝ่าย: เส้นประลงนาม และวันเดือนปีอยู่กึ่งกลางเส้นประพอดี */
     .head-sig-block {
       margin-top: 8mm; margin-left: 42%; width: 58%;
+      position: relative; min-height: 27mm;
     }
     .head-sig-block .sig-row {
       display: flex; align-items: baseline; width: 100%;
     }
 
-    .sig-center-col {
-      flex: 1; display: flex; flex-direction: column;
-      align-items: center; min-width: 50mm;
+    .sig-line-wrap {
+      position: relative;
+      flex: 1;
+      display: flex;
+      align-items: baseline;
+      margin: 0 4px;
     }
     .sig-fill {
       width: 100%; height: 1.2em;
       border-bottom: 1px dotted #000; display: block;
     }
-    .sig-date-row {
-      margin-top: 18mm;
-      display: flex; align-items: baseline;
-      justify-content: center; white-space: nowrap;
+    .sig-date-centered {
+      position: absolute;
+      top: 18mm;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      align-items: baseline;
+      justify-content: center;
+      white-space: nowrap;
     }
     .date-slot {
       display: inline-block; width: 14mm;
@@ -277,8 +288,10 @@ export function generateForm3Html(request, car, driver, recipient) {
       font-size: 16pt; line-height: 1.4; font-weight: 700;
     }
 
+    /* ผู้มีอำนาจสั่งใช้รถ: เส้นประลงนาม และวันเดือนปีอยู่กึ่งกลางเส้นประพอดี */
     .auth-sig-block {
       margin-top: 8mm; margin-left: 36%; width: 64%;
+      position: relative; min-height: 27mm;
     }
     .auth-sig-block .sig-row {
       display: flex; align-items: baseline; width: 100%;
@@ -391,10 +404,10 @@ export function generateForm3Html(request, car, driver, recipient) {
           <div class="requester-sig-sub">
             (&nbsp;${requesterName || '............................................................'}&nbsp;)
           </div>
-          <div class="requester-sig-sub dotted-fill ${requesterPosition.length > 25 ? 'font-15pt' : ''}">
+          <div class="requester-sig-sub ${requesterPosition.length > 25 ? 'font-15pt' : ''}">
             ${requesterPosition || '&nbsp;'}
           </div>
-          <div class="requester-sig-sub dotted-fill ${requesterDepartment.length > 25 ? 'font-15pt' : ''}">
+          <div class="requester-sig-sub ${requesterDepartment.length > 25 ? 'font-15pt' : ''}">
             ${requesterDepartment || '&nbsp;'}
           </div>
         </div>
@@ -417,16 +430,16 @@ export function generateForm3Html(request, car, driver, recipient) {
       <div class="head-sig-block">
         <div class="sig-row">
           <span class="row-label">ลงชื่อ</span>
-          <div class="sig-center-col">
+          <div class="sig-line-wrap">
             <span class="sig-fill">&nbsp;</span>
-            <div class="sig-date-row">
+            <div class="sig-date-centered">
               <span class="date-slot">&nbsp;</span>/
               <span class="date-slot">&nbsp;</span>/
               <span class="date-slot">&nbsp;</span>
               <span class="row-label" style="margin-left:4px">(วัน เดือน ปี)</span>
             </div>
           </div>
-          <span class="row-label" style="margin-left:6px">หัวหน้าฝ่ายหรือผู้แทน</span>
+          <span class="row-label" style="margin-left:4px">หัวหน้าฝ่ายหรือผู้แทน</span>
         </div>
       </div>
 
@@ -437,9 +450,9 @@ export function generateForm3Html(request, car, driver, recipient) {
       <div class="auth-sig-block">
         <div class="sig-row">
           <span class="row-label">(ลงนามผู้มีอำนาจสั่งใช้รถ)</span>
-          <div class="sig-center-col">
+          <div class="sig-line-wrap">
             <span class="sig-fill">&nbsp;</span>
-            <div class="sig-date-row">
+            <div class="sig-date-centered">
               <span class="date-slot">&nbsp;</span>/
               <span class="date-slot">&nbsp;</span>/
               <span class="date-slot">&nbsp;</span>
