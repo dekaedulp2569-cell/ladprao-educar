@@ -870,17 +870,8 @@ function RequestDetail({
   }
 
 const handleApprove = async () => {
-  // ขั้นตอนที่ 1: อนุมัติสถานะก่อน (เปลี่ยนแค่ status เดียว ไม่แตะรถ/คนขับ)
-  const approved = await updateRequest(request.id, { 
-    status: 'approved',
-    director_approval_status: request.status === 'tentative' ? 'approved' : request.director_approval_status
-  })
-  if (!approved) return
-
-  // ขั้นตอนที่ 2: ถ้ามีการเลือกรถ/คนขับไว้ ให้จัดสรรทีหลัง (อัปเดตเฉพาะ allocation)
-  if (canManageAllocation && (allocation.carId || allocation.driverId || allocation.externalCar || allocation.externalDriver)) {
-    await onSaveAllocation(request, allocation)
-  }
+  // อนุมัติสถานะเท่านั้น (ไม่แตะรถ/คนขับ)
+  await onApprove(request)
 }
 
   return (
