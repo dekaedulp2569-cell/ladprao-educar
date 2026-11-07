@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { supabase } from '../lib/supabase'
 import { buildStatusMessage, notifyLine } from '../lib/line'
@@ -8,6 +8,8 @@ import {
   DOC_TYPE,
   STATUS,
   formatDate,
+  carTypeDisplay,
+  formatDateTimeRange,
   includesWeekend,
   isOutOfBkk,
   isOutOfHours,
@@ -57,6 +59,9 @@ export function CarRequestForm({ onSubmitted }) {
   const [serverError, setServerError] = useState('')
   const [lineNotification, setLineNotification] = useState(null)
   const [resendingNotification, setResendingNotification] = useState(false)
+  // 🚦 ผลการตรวจสดช่วงเวลาที่กรอก: null = ยังไม่ตรวจ, [] = ว่าง, [...งาน] = มีงานล็อกคิวทับกัน
+  const [timeConflicts, setTimeConflicts] = useState(null)
+  const [calendarCars, setCalendarCars] = useState([])
 
   const update = (field, value) => {
     setForm((current) => ({ ...current, [field]: value }))
@@ -93,6 +98,46 @@ export function CarRequestForm({ onSubmitted }) {
       form.is_public_holiday,
     [form.start_datetime, form.end_datetime, form.destination_province, form.is_public_holiday],
   )
+
+  // โหลดรถในระบบหนึ่งครั้งเพื่อแสดงทะเบียนของงานที่ล็อกคิวแล้ว
+  useEffect(() => {
+    let cancelled = false
+    supabase
+      .from('cars')
+      .select('id, license_plate, car_type')
+      .then(({ data }) => {
+        if (!cancelled) setCalendarCars(data || [])
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  // 🚦 ตรวจสดผ่าน view สาธารณะ (งานอนุมัติแล้ว 🟢 + รอ ผอ.เขต 🟠):
+  // ช่วงเวลาที่กรอกทับกับงานล็อกคิวหรือไม่ — คำเตือนอ่อน ส่งคำขอได้ตามปกติ
+  useEffect(() => {
+    const start = form.start_datetime ? new Date(form.start_datetime) : null
+    const end = form.end_datetime ? new Date(form.end_datetime) : null
+    if (!start || !end || Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end <= start) {
+      setTimeConflicts(null)
+      return
+    }
+    const startISO = toISO(form.start_datetime)
+    const endISO = toISO(form.end_datetime)
+    let active = true
+    const timer = setTimeout(async () => {
+      const { data } = await supabase
+        .from('public_car_calendar')
+        .select('id, status, destination, start_datetime, end_datetime, assigned_car_id, external_car_info')
+        .lt('start_datetime', endISO)
+        .gt('end_datetime', startISO)
+      if (active) setTimeConflicts(data || [])
+    }, 400)
+    return () => {
+      active = false
+      clearTimeout(timer)
+    }
+  }, [form.start_datetime, form.end_datetime])
 
   const validation = () => {
     const nextErrors = {}
@@ -505,6 +550,43 @@ export function CarRequestForm({ onSubmitted }) {
                 className={inputClass}
               />
             </Field>
+            {timeConflicts !== null ? (
+              timeConflicts.length ? (
+                <div className="sm:col-span-2 rounded-xl border border-amber-200 bg-amber-50/60 p-3">
+                  <p className="text-xs font-bold text-amber-800">
+                    ⚠️ ช่วงเวลานี้มีงานที่ล็อกคิวอยู่แล้ว {timeConflicts.length} งาน — อาจไม่มีรถว่าง
+                  </p>
+                  <ul className="mt-2 space-y-1.5">
+                    {timeConflicts.map((item) => {
+                      const conflictCar = calendarCars.find((car) => car.id === item.assigned_car_id)
+                      return (
+                        <li
+                          key={item.id}
+                          className="rounded-lg border border-amber-200 bg-white px-2.5 py-2 text-[11px] leading-relaxed text-amber-900"
+                        >
+                          {STATUS[item.status]?.emoji} {STATUS[item.status]?.short} ·{' '}
+                          <b className="font-semibold">{item.destination}</b> ·{' '}
+                          {formatDateTimeRange(item.start_datetime, item.end_datetime)} · รถ:{' '}
+                          {conflictCar
+                            ? `${conflictCar.license_plate} (${carTypeDisplay(conflictCar.car_type)})`
+                            : item.external_car_info || 'ยังไม่จัดสรรรถ'}
+                        </li>
+                      )
+                    })}
+                  </ul>
+                  <p className="mt-2 text-[10.5px] leading-relaxed text-amber-700">
+                    ยังส่งคำขอได้ตามปกติ — Admin จะเห็นการซ้ำซ้อนนี้ในแผงความพร้อมของหน้าจัดสรร
+                    และจัดสรรรถว่างให้หรือประสานปรับเวลากับผู้ขอ
+                  </p>
+                </div>
+              ) : (
+                <div className="sm:col-span-2 rounded-xl border border-emerald-200 bg-emerald-50/60 p-3">
+                  <p className="text-xs font-bold text-emerald-800">
+                    ✅ ช่วงเวลานี้ว่าง — ไม่มีงานล็อกคิวทับกัน
+                  </p>
+                </div>
+              )
+            ) : null}
             <Field label="วัตถุประสงค์เพิ่มเติม" className="sm:col-span-2">
               <textarea
                 value={form.purpose}

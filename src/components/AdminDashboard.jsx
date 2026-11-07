@@ -7,6 +7,7 @@ import {
   CAR_TYPE,
   CAR_TYPE_OPTIONS,
   DOC_TYPE,
+  STATUS,
   classNames,
   carTypeDisplay,
   currentFiscalYear,
@@ -52,6 +53,48 @@ const REMINDER_PRESETS = [
   { key: 'routine', label: '🔁 งานประจำ (เฉพาะ 30 นาที)', levels: ['30'] },
   { key: 'silent', label: '⊘ ไม่ต้องแจ้งเลย', levels: [] },
 ]
+
+// 🚦 แจ้งเตือนการใช้งานซ้ำซ้อน: วันเดียวกัน เวลาทับกัน รถคันเดียวกัน/คนขับคนเดียวกัน
+// เทียบกับงานที่จัดสรรไปแล้วทุกสถานะ (🟢 approved / 🟠 tentative / 🟡 pending) — ตัดงานไม่อนุมัติและยกเลิก
+// จุดสลับกันพอดี (เช่น 08:00-10:00 กับ 10:00-12:00) ไม่นับว่าทับซ้อน
+const CONFLICT_STATUSES = ['approved', 'tentative', 'pending']
+
+const sameExternalText = (text, other) =>
+  typeof text === 'string' &&
+  typeof other === 'string' &&
+  text.trim() !== '' &&
+  text.trim() === other.trim()
+
+function findAllocationConflicts(request, allocation, allRequests) {
+  const start = new Date(request.start_datetime)
+  const end = new Date(request.end_datetime)
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return []
+
+  const internalCar = allocation.carMode === 'internal' ? allocation.carId || null : null
+  const externalCar = allocation.carMode === 'external' ? allocation.externalCar || '' : ''
+  const internalDriver = allocation.driverMode === 'internal' ? allocation.driverId || null : null
+  const externalDriver = allocation.driverMode === 'external' ? allocation.externalDriver || '' : ''
+  if (!internalCar && !externalCar.trim() && !internalDriver && !externalDriver.trim()) return []
+
+  const result = []
+  for (const item of allRequests || []) {
+    if (!item || item.id === request.id) continue
+    if (!CONFLICT_STATUSES.includes(item.status)) continue
+    const itemStart = new Date(item.start_datetime)
+    const itemEnd = new Date(item.end_datetime)
+    if (Number.isNaN(itemStart.getTime()) || Number.isNaN(itemEnd.getTime())) continue
+    if (!overlaps(start, end, itemStart, itemEnd)) continue
+
+    const carClash =
+      (internalCar && item.assigned_car_id === internalCar) ||
+      (externalCar.trim() !== '' && sameExternalText(item.external_car_info, externalCar))
+    const driverClash =
+      (internalDriver && item.assigned_driver_id === internalDriver) ||
+      (externalDriver.trim() !== '' && sameExternalText(item.external_driver_name, externalDriver))
+    if (carClash || driverClash) result.push({ item, carClash, driverClash })
+  }
+  return result.sort((a, b) => new Date(a.item.start_datetime) - new Date(b.item.start_datetime))
+}
 
 export function AdminDashboard() {
   const { session } = useAuth()
@@ -254,7 +297,7 @@ export function AdminDashboard() {
           statusLabel: 'อนุมัติแล้ว (ล็อกคิว)',
           text: buildStatusMessage(approved, 'อนุมัติแล้ว (ล็อกคิว)'),
         })
-        // 🟢 ต่อจากแจ้งผู้ขอ/กลุ่ม: ตามด้วยใบสั่งงานฉบับเต็มถ้ามีการจัดสรคนขับไว้แล้ว
+        // 🟢 ต่อจากแจ้งผู้ขอ/กลุ่ม: ตามด้วยใบสั่งงานฉบับเต็มถ้ามีการจัดสรรคนขับไว้แล้ว
         const mission = await sendDriverMissionNotice(approved)
         return { saved: true, mission }
       }
@@ -273,7 +316,7 @@ export function AdminDashboard() {
           statusLabel: 'อนุมัติแล้ว (ล็อกคิว)',
           text: buildStatusMessage(approved, 'อนุมัติแล้ว (ล็อกคิว)'),
         })
-        // 🟢 ต่อจากแจ้งผู้ขอ/กลุ่ม: ตามด้วยใบสั่งงานฉบับเต็มถ้ามีการจัดสรคนขับไว้แล้ว
+        // 🟢 ต่อจากแจ้งผู้ขอ/กลุ่ม: ตามด้วยใบสั่งงานฉบับเต็มถ้ามีการจัดสรรคนขับไว้แล้ว
         const mission = await sendDriverMissionNotice(approved)
         return { saved: true, mission }
       }
@@ -339,22 +382,8 @@ const saveAllocation = async (request, allocation) => {
   const internalCar = allocation.carMode === 'internal' ? allocation.carId || null : null
   const internalDriver = allocation.driverMode === 'internal' ? allocation.driverId || null : null
 
-  // ตรวจสอบการชนของรถ
-  if (internalCar) {
-    const conflict = requests.find(
-      (item) =>
-        item.id !== request.id &&
-        item.status === 'approved' &&
-        item.assigned_car_id === internalCar &&
-        overlaps(request.start_datetime, item.start_datetime, item.end_datetime, item.end_datetime),
-    )
-    if (conflict) {
-      const proceed = window.confirm(
-        `รถคันนี้ถูกใช้ในรายการ ${conflict.doc_number} ในช่วงเวลาเดียวกัน\nต้องการบันทึกทับซ้อนหรือไม่`,
-      )
-      if (!proceed) return false
-    }
-  }
+  // 🚦 การเตือนการใช้งานซ้ำซ้อนทำที่หน้าจัดสรร (แผงความพร้อมการจัดสรร + ยืนยันภายในหน้าต่าง)
+  // ก่อนเรียกฟังก์ชันนี้แล้ว — ที่นี่บันทึกตามที่ผู้ใช้ยืนยันเรียบร้อย
 
   // อัปเดตเฉพาะฟิลด์จัดสรร (ไม่แตะ status) + ตั้งค่าการแจ้งเตือนก่อนออกรถของงานนี้
   const reminderLevels = DEFAULT_REMINDER_LEVELS.filter((level) =>
@@ -632,6 +661,7 @@ const saveAllocation = async (request, allocation) => {
         request={selected}
         cars={cars}
         drivers={drivers}
+        allRequests={requests}
         busy={busy}
         onClose={() => setSelected(null)}
         onApprove={approve}
@@ -852,6 +882,7 @@ function RequestDetail({
   request,
   cars,
   drivers,
+  allRequests,
   busy,
   onClose,
   onApprove,
@@ -877,6 +908,8 @@ function RequestDetail({
   // จะแสดงหลังบันทึกการจัดสรร / หลังอนุมัติ — หน้าต่างไม่ปิดเอง ให้ผู้ใช้กดปิดเอง
   const [allocationStatus, setAllocationStatus] = useState(null)
   const [approveStatus, setApproveStatus] = useState(null)
+  // 🚦 แถบยืนยันกรณีจัดสรรทับกับงานเดิม — ยืนยันภายในหน้าต่างเดิม (แทน window.confirm)
+  const [overlapConfirm, setOverlapConfirm] = useState(false)
 
   useEffect(() => {
     if (!request) return
@@ -895,6 +928,11 @@ function RequestDetail({
     setAllocationStatus(null)
     setApproveStatus(null)
   }, [request])
+
+  // เมื่อแก้การจัดสรร (เลือกรถ/คนขับใหม่) ปิดแถบยืนยันเดิมทันที — กดบันทึกอีกครั้งจะตรวจใหม่
+  useEffect(() => {
+    setOverlapConfirm(false)
+  }, [allocation])
 
   if (!request) return null
 
@@ -922,8 +960,40 @@ function RequestDetail({
     ? `งานนี้จะส่งแจ้งเตือน ${allocation.reminderLevels.length} ฉบับ: ${selectedReminderLabels.join(' · ')}`
     : 'งานนี้ไม่ส่งแจ้งซ้ำก่อนออกรถ (คนขับยังได้ใบสั่งงานตอนอนุมัติ + สรุปประจำวันตามปกติ)'
 
-  const submitAllocation = async () => {
+  // 🚦 ตรวจสดการใช้งานซ้ำซ้อน: รถ/คนขับที่เลือก เทียบกับงานทุกสถานะที่จัดสรรไว้แล้ว (ช่วงเวลาทับกัน)
+  const allocationConflicts = useMemo(
+    () => findAllocationConflicts(request, allocation, allRequests),
+    [request, allocation, allRequests],
+  )
+  const carConflicts = allocationConflicts.filter((entry) => entry.carClash)
+  const driverConflicts = allocationConflicts.filter((entry) => entry.driverClash)
+
+  const chosenCar = allocation.carMode === 'internal' ? cars.find((item) => item.id === allocation.carId) : null
+  const chosenCarSet = allocation.carMode === 'external' ? allocation.externalCar.trim() !== '' : Boolean(chosenCar)
+  const chosenCarLabel = allocation.carMode === 'internal'
+    ? chosenCar
+      ? `${chosenCar.license_plate} (${carTypeDisplay(chosenCar.car_type)})`
+      : ''
+    : allocation.externalCar.trim()
+  const chosenDriver = allocation.driverMode === 'internal'
+    ? drivers.find((item) => item.id === allocation.driverId)
+    : null
+  const chosenDriverSet =
+    allocation.driverMode === 'external' ? allocation.externalDriver.trim() !== '' : Boolean(chosenDriver)
+  const chosenDriverLabel = allocation.driverMode === 'internal'
+    ? chosenDriver
+      ? `${chosenDriver.nickname ? `${chosenDriver.nickname} - ` : ''}${chosenDriver.full_name}`
+      : ''
+    : allocation.externalDriver.trim()
+
+  const submitAllocation = async (force = false) => {
     setAllocationStatus(null)
+    // 🚦 พบการทับซ้อน → ให้ยืนยันภายในหน้าต่างก่อน จึงบันทึกกระทบงานเดิมได้
+    if (allocationConflicts.length > 0 && !force) {
+      setOverlapConfirm(true)
+      return
+    }
+    setOverlapConfirm(false)
     const saved = await onSaveAllocation(request, allocation)
     if (!saved) return
     const driverAllocated = allocation.driverMode === 'internal'
@@ -932,8 +1002,8 @@ function RequestDetail({
     if (!driverAllocated) {
       setAllocationStatus({
         tone: 'amber',
-        text: '✅ บันทึกการจัดสรรแล้ว (ยังไม่ได้จัดสรคนขับ)',
-        sub: 'ใบสั่งงานจะส่งให้คนขับเมื่อจัดสรคนขับเรียบร้อย • หน้าต่างยังเปิดอยู่ — กดปิดเมื่อพร้อม',
+        text: '✅ บันทึกการจัดสรรแล้ว (ยังไม่ได้จัดสรรคนขับ)',
+        sub: 'ใบสั่งงานจะส่งให้คนขับเมื่อจัดสรรคนขับเรียบร้อย • หน้าต่างยังเปิดอยู่ — กดปิดเมื่อพร้อม',
       })
       return
     }
@@ -1144,6 +1214,85 @@ const handleApprove = async () => {
               )}
             </div>
 
+            {/* 🚦 ความพร้อมการจัดสรร — ตรวจสดการใช้งานซ้ำซ้อน (วันเดียวกัน เวลาทับกัน รถ/คนขับเดียวกัน) */}
+            <div
+              className={classNames(
+                'rounded-xl border p-3',
+                allocationConflicts.length
+                  ? 'border-rose-200 bg-rose-50/60'
+                  : 'border-emerald-200 bg-emerald-50/60',
+              )}
+            >
+              <p
+                className={classNames(
+                  'text-xs font-bold',
+                  allocationConflicts.length ? 'text-rose-800' : 'text-emerald-800',
+                )}
+              >
+                {allocationConflicts.length
+                  ? `🚦 ความพร้อมการจัดสรร — พบงานที่ทับซ้อนกัน ${allocationConflicts.length} งาน`
+                  : '🚦 ความพร้อมการจัดสรร — รถและคนขับว่างทั้งช่วงเวลานี้'}
+              </p>
+              <div className="mt-2 space-y-2">
+                <div className="rounded-xl border border-slate-200 bg-white p-2.5">
+                  {!chosenCarSet ? (
+                    <p className="text-[11px] text-slate-400">🚗 ยังไม่ได้เลือก / ระบุรถ</p>
+                  ) : carConflicts.length ? (
+                    <>
+                      <p className="text-[11px] font-bold text-rose-800">
+                        🚗 รถ {chosenCarLabel} — ทับซ้อน {carConflicts.length} งาน
+                      </p>
+                      <ul className="mt-1.5 space-y-1">
+                        {carConflicts.map(({ item }) => (
+                          <li key={item.id} className="text-[10.5px] leading-relaxed text-rose-900">
+                            {STATUS[item.status]?.emoji} {STATUS[item.status]?.short} · <b>{item.doc_number}</b> ·{' '}
+                            {formatDateTimeRange(item.start_datetime, item.end_datetime)} · {item.destination}
+                          </li>
+                        ))}
+                      </ul>
+                    </>
+                  ) : (
+                    <p className="text-[11px] font-semibold text-emerald-700">
+                      ✅ รถ {chosenCarLabel} — ว่างทั้งช่วงเวลานี้ (ไม่มีงานทับ)
+                    </p>
+                  )}
+                </div>
+                <div className="rounded-xl border border-slate-200 bg-white p-2.5">
+                  {!chosenDriverSet ? (
+                    <p className="text-[11px] text-slate-400">👤 ยังไม่ได้เลือก / ระบุคนขับ</p>
+                  ) : driverConflicts.length ? (
+                    <>
+                      <p className="text-[11px] font-bold text-rose-800">
+                        👤 คนขับ {chosenDriverLabel} — ทับซ้อน {driverConflicts.length} งาน
+                      </p>
+                      <ul className="mt-1.5 space-y-1">
+                        {driverConflicts.map(({ item }) => (
+                          <li key={item.id} className="text-[10.5px] leading-relaxed text-rose-900">
+                            {STATUS[item.status]?.emoji} {STATUS[item.status]?.short} · <b>{item.doc_number}</b> ·{' '}
+                            {formatDateTimeRange(item.start_datetime, item.end_datetime)} · {item.destination}
+                          </li>
+                        ))}
+                      </ul>
+                    </>
+                  ) : (
+                    <p className="text-[11px] font-semibold text-emerald-700">
+                      ✅ คนขับ {chosenDriverLabel} — ว่างทั้งช่วงเวลานี้ (ไม่มีงานทับ)
+                    </p>
+                  )}
+                </div>
+              </div>
+              <p
+                className={classNames(
+                  'mt-2 text-[10.5px] leading-relaxed',
+                  allocationConflicts.length ? 'text-rose-700' : 'text-emerald-700',
+                )}
+              >
+                {allocationConflicts.length
+                  ? 'กด "บันทึกการจัดสรร" แล้วต้องยืนยันการบันทึกกระทบงานเดิมในหน้าต่างนี้ก่อน'
+                  : 'ตรวจสดขณะเลือก — เทียบงานทุกสถานะที่จัดสรรไว้แล้ว ยกเว้นงานไม่อนุมัติ/ยกเลิก (ช่วงเวลาต่อกันพอดีไม่นับว่าทับซ้อน)'}
+              </p>
+            </div>
+
             {/* 🔔 เลือกการแจ้งเตือนก่อนออกรถ (ผูกกับงานนี้ — งานประจำปิดบางฉบับได้) */}
             <div className="rounded-xl border border-amber-200 bg-amber-50/60 p-3">
               <p className="text-xs font-bold text-amber-800">
@@ -1203,12 +1352,46 @@ const handleApprove = async () => {
 
             <button
               type="button"
-              onClick={submitAllocation}
+              onClick={() => submitAllocation()}
               disabled={busy}
-              className="w-full rounded-xl bg-slate-800 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-900 disabled:opacity-60"
+              className={classNames(
+                'w-full rounded-xl px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-900 disabled:opacity-60',
+                allocationConflicts.length && !overlapConfirm ? 'bg-rose-600' : 'bg-slate-800',
+              )}
             >
-              {busy ? 'กำลังบันทึก...' : 'บันทึกการจัดสรร'}
+              {busy
+                ? 'กำลังบันทึก...'
+                : allocationConflicts.length && !overlapConfirm
+                  ? 'บันทึกการจัดสรร (ทับซ้อน — ต้องยืนยัน)'
+                  : 'บันทึกการจัดสรร'}
             </button>
+
+            {overlapConfirm ? (
+              <div className="rounded-xl border border-rose-300 bg-rose-50 p-3">
+                <p className="text-xs font-semibold leading-relaxed text-rose-800">
+                  ⚠️ การจัดสรรนี้ทับซ้อนกับงานเดิม {allocationConflicts.length} งาน (รายการด้านบน)
+                  <br />
+                  ยืนยันเพื่อบันทึกทั้งที่กระทบงานเดิม หรือกลับไปเลือกรถ/คนขับคันอื่น
+                </p>
+                <div className="mt-2 flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => submitAllocation(true)}
+                    disabled={busy}
+                    className="flex-1 rounded-xl bg-rose-600 px-3 py-2 text-xs font-semibold text-white transition hover:bg-rose-700 disabled:opacity-60"
+                  >
+                    ยืนยันบันทึกกระทบงานเดิม
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setOverlapConfirm(false)}
+                    className="flex-1 rounded-xl bg-slate-100 px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-200"
+                  >
+                    กลับไปเลือกใหม่
+                  </button>
+                </div>
+              </div>
+            ) : null}
 
             {allocationStatus ? (
               <div
