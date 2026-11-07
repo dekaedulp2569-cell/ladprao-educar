@@ -9,36 +9,52 @@
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import {
-  buildMissionText,
+  bannerRow,
   carTypeLabel,
   corsHeaders,
+  formatThaiDateTimeRange,
   isValidLineId,
   json,
+  labelValueRow,
   pushFlex,
 } from '../_shared/line.ts'
 
 const LOOK_AHEAD_MINUTES = 70
 
+// 🔴 แจ้งซ้ำก่อนออกรถ: คนขับได้รับการแจ้งเตือนในรูปแบบ "ใบสั่งงาน" (ข้อมูลชุดเดียวกับตอนอนุมัติ)
+// พร้อมแถบนับเวลาถอยหลังเน้นอยู่ด้านบน ระดับความละเอียดลดลงตามความใกล้ของเวลา
 const REMINDER_META = {
   driver_60: {
     color: '#DC2626',
-    title: 'อีก 1 ชั่วโมงถึงเวลาเดินทาง',
+    kicker: 'EduLP Car • ใบสั่งงานปฏิบัติหน้าที่ (แจ้งซ้ำ)',
+    title: '🚨 ใบสั่งงาน: อีก 1 ชั่วโมงถึงเวลาออกรถ',
+    banner: '⏰ เหลือเวลา 60 นาที — โปรดเตรียมรถที่จุดรับให้พร้อม',
     alt: 'แจ้งเตือนคนขับ: อีก 1 ชั่วโมงถึงเวลาเดินทาง',
+    variant: 'full',
   },
   driver_30: {
     color: '#DC2626',
-    title: 'อีก 30 นาทีถึงเวลาเดินทาง',
+    kicker: 'EduLP Car • ใบสั่งงานปฏิบัติหน้าที่ (แจ้งซ้ำ)',
+    title: '🚨 ใบสั่งงาน: อีก 30 นาทีถึงเวลาออกรถ',
+    banner: '⏰ เหลือเวลา 30 นาที — โปรดจอดรถที่จุดรับตามเวลานัดหมาย',
     alt: 'แจ้งเตือนคนขับ: อีก 30 นาทีถึงเวลาเดินทาง',
+    variant: 'compact',
   },
   driver_10: {
     color: '#DC2626',
-    title: 'อีก 10 นาทีถึงเวลาเดินทาง',
+    kicker: 'EduLP Car • ใบสั่งงานปฏิบัติหน้าที่ (แจ้งซ้ำ)',
+    title: '🚨 ใบสั่งงาน: อีก 10 นาทีรถพร้อมออก',
+    banner: '⏰ เหลือเวลา 10 นาที — โปรดอยู่ที่จุดรับตามเวลา ปล่อยรถทันทีที่ผู้เดินทางมาครบ',
     alt: 'แจ้งเตือนคนขับ: อีก 10 นาทีถึงเวลาเดินทาง',
+    variant: 'compact',
   },
   related_10: {
     color: '#DC2626',
-    title: 'อีก 10 นาทีรถจะออกเดินทาง',
+    kicker: 'EduLP Car • แจ้งเตือนผู้เดินทาง',
+    title: '🚨 อีก 10 นาที รถจะออกจากจุดรับ',
+    banner: '⏰ เหลือเวลา 10 นาที — โปรดประจำที่จุดรับตามเวลา',
     alt: 'แจ้งเตือนผู้เกี่ยวข้อง: อีก 10 นาทีรถจะออกเดินทาง',
+    variant: 'passenger',
   },
 } as const
 
@@ -49,33 +65,55 @@ function reminderFlex(
   type: ReminderType,
   carLabel: string,
   driverLabel: string,
+  driverPhone?: string,
 ) {
   const meta = REMINDER_META[type]
-  const minutesLeft = type === 'driver_60' ? 60 : type === 'driver_30' ? 30 : 10
+  const req = job as import('../_shared/line.ts').CarRequestPayload
+  const destination = `${req.destination || '-'}${
+    req.destination_province ? ` (${req.destination_province})` : ''
+  }`
+  const when = formatThaiDateTimeRange(req.start_datetime, req.end_datetime)
+  const pickup = req.pickup_location || '-'
+  const coordinator = `${req.passenger_name || '-'}${req.passenger_phone ? ` (${req.passenger_phone})` : ''}`
 
-  const missionText = buildMissionText({
-    index: 1,
-    request: job as import('../_shared/line.ts').CarRequestPayload,
-    carLabel,
-    driverLabel,
-  })
+  const rows: Record<string, unknown>[] = [bannerRow(meta.banner)]
 
-  const rows: Record<string, unknown>[] = [
-    {
-      type: 'text',
-      text: `เหลืออีกประมาณ ${minutesLeft} นาทีถึงเวลาเดินทาง`,
-      size: 'md',
-      weight: 'bold',
-      color: meta.color,
-      wrap: true,
-    },
-    {
-      type: 'text',
-      text: missionText,
-      size: 'md',
-      wrap: true,
-    },
-  ]
+  if (meta.variant === 'passenger') {
+    // 🔴 แจ้งผู้ขอ/ผู้เดินทาง: เน้นจุดรับ + เวลาออกรถ
+    rows.push(
+      labelValueRow('จุดรับ', pickup, { valueWeight: 'bold' }),
+      labelValueRow('เวลาออกรถ', when, { valueWeight: 'bold' }),
+      labelValueRow('ปลายทาง', destination),
+      labelValueRow('รถ', carLabel, { valueWeight: 'bold', valueColor: '#047857' }),
+      labelValueRow('คนขับ', `${driverLabel}${driverPhone ? ` (${driverPhone})` : ''}`),
+    )
+  } else if (meta.variant === 'compact') {
+    // 🔴 แจ้งซ้ำ 30/10 นาที: ย่อ เน้นจุดรับ + เวลา + ผู้ประสานงาน
+    rows.push(
+      labelValueRow('จุดรับ (ต้นทาง)', pickup, { valueWeight: 'bold' }),
+      labelValueRow('วัน-เวลา', when, { valueWeight: 'bold' }),
+      labelValueRow('ปลายทาง', destination),
+      labelValueRow('รถยนต์', carLabel, { valueWeight: 'bold', valueColor: '#047857' }),
+      labelValueRow('ผู้ประสานงาน', coordinator),
+    )
+  } else {
+    // 🔴 แจ้งซ้ำ 60 นาที: ใบสั่งงานฉบับเต็ม เหมือนที่ส่งตอนอนุมัติ
+    rows.push(
+      labelValueRow('เลขที่เอกสาร', req.doc_number || '-'),
+      labelValueRow('วัน-เวลา', when, { valueWeight: 'bold' }),
+      labelValueRow('จุดรับ (ต้นทาง)', pickup),
+      labelValueRow('ปลายทาง', destination),
+      labelValueRow('วัตถุประสงค์', req.purpose || '-'),
+      labelValueRow('ผู้ประสานงานหน้างาน', req.passenger_name || '-', { valueWeight: 'bold' }),
+      labelValueRow('เบอร์ติดต่อ', req.passenger_phone || '-', {
+        valueWeight: 'bold',
+        valueColor: '#1D4ED8',
+      }),
+      { type: 'separator', margin: 'sm' },
+      labelValueRow('รถยนต์', carLabel, { valueWeight: 'bold', valueColor: '#047857' }),
+      labelValueRow('พนักงานขับรถ', driverLabel),
+    )
+  }
 
   return {
     type: 'bubble',
@@ -84,17 +122,11 @@ function reminderFlex(
       type: 'box',
       layout: 'vertical',
       contents: [
-        {
-          type: 'text',
-          text: 'EduLP Car • แจ้งเตือนก่อนเดินทาง',
-          color: '#FEF3C7',
-          size: 'sm',
-          weight: 'bold',
-        },
+        { type: 'text', text: meta.kicker, color: '#FEE2E2', size: 'xs', weight: 'bold', wrap: true },
         { type: 'text', text: meta.title, color: '#FFFFFF', size: 'md', weight: 'bold', wrap: true },
       ],
     },
-    body: { type: 'box', layout: 'vertical', spacing: 'sm', contents: rows },
+    body: { type: 'box', layout: 'vertical', spacing: 'xs', contents: rows },
   }
 }
 
@@ -224,7 +256,7 @@ Deno.serve(async (req) => {
           job.id,
           'driver_60',
           driverLineId,
-          reminderFlex(job, 'driver_60', carLabel, driverLabel),
+          reminderFlex(job, 'driver_60', carLabel, driverLabel, driver?.phone),
         ),
       })
     }
@@ -238,7 +270,7 @@ Deno.serve(async (req) => {
           job.id,
           'driver_30',
           driverLineId,
-          reminderFlex(job, 'driver_30', carLabel, driverLabel),
+          reminderFlex(job, 'driver_30', carLabel, driverLabel, driver?.phone),
         ),
       })
     }
@@ -253,7 +285,7 @@ Deno.serve(async (req) => {
             job.id,
             'driver_10',
             driverLineId,
-            reminderFlex(job, 'driver_10', carLabel, driverLabel),
+            reminderFlex(job, 'driver_10', carLabel, driverLabel, driver?.phone),
           ),
         })
       }
@@ -273,7 +305,7 @@ Deno.serve(async (req) => {
             job.id,
             'related_10',
             relatedId,
-            reminderFlex(job, 'related_10', carLabel, driverLabel),
+            reminderFlex(job, 'related_10', carLabel, driverLabel, driver?.phone),
           ),
         })
       }

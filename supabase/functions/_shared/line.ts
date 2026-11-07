@@ -239,6 +239,66 @@ export function statusEmoji(status?: string | null) {
   return STATUS_EMOJI[String(status || '')] || '⚪'
 }
 
+/**
+ * แถวแบบสองช่อง: ป้ายกำกับ (หัวข้อ/ส่วนที่ไม่ใช่เนื้อหา → ตัวหนา เน้นชัด)
+ * ฝั่งค่า (เนื้อหา) เป็นข้อความปกติ — ใช้ร่วมกันทุกสถานะ เพื่อให้เห็นชัดว่าแต่ละบรรทัดคืออะไร
+ */
+export function labelValueRow(
+  label: string,
+  value: string,
+  opts?: {
+    labelColor?: string
+    labelSize?: string
+    valueColor?: string
+    valueWeight?: string
+    valueSize?: string
+    labelFlex?: number
+    valueFlex?: number
+  },
+) {
+  return {
+    type: 'box',
+    layout: 'horizontal',
+    contents: [
+      {
+        type: 'text',
+        text: label,
+        size: opts?.labelSize || 'xs',
+        weight: 'bold',
+        color: opts?.labelColor || '#64748B',
+        flex: opts?.labelFlex ?? 3,
+        wrap: true,
+      },
+      {
+        type: 'text',
+        text: value,
+        size: opts?.valueSize || 'sm',
+        weight: opts?.valueWeight || 'regular',
+        color: opts?.valueColor || '#1E293B',
+        flex: opts?.valueFlex ?? 7,
+        wrap: true,
+      },
+    ],
+  }
+}
+
+/**
+ * แถบเน้นข้อความสำคัญ เช่น นับเวลาถอยหลังก่อนออกรถ หรือคำเตือนการยกเลิก
+ * ค่าเริ่มต้นพื้นหลังแดงอ่อน (ใช้กับสถานะ 🔴) — ส่ง background/color ได้เพื่อใช้ธีมอื่น
+ */
+export function bannerRow(text: string, opts?: { background?: string; color?: string }) {
+  return {
+    type: 'box',
+    layout: 'vertical',
+    backgroundColor: opts?.background || '#FEE2E2',
+    cornerRadius: '8px',
+    paddingAll: '8px',
+    contents: [
+      { type: 'text', text, size: 'sm', weight: 'bold', color: opts?.color || '#B91C1C', wrap: true },
+    ],
+  }
+}
+
 export const CAR_TYPE_LABEL: Record<string, string> = {
   van: 'รถตู้',
   pickup: 'รถกระบะ',

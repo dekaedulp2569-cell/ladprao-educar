@@ -1,11 +1,13 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import {
   STATUS_LABEL,
+  bannerRow,
   carTypeLabel,
   corsHeaders,
   formatThaiDateTimeRange,
   isValidLineId,
   json,
+  labelValueRow,
   pushFlex,
   resolveGroupId,
   statusColor,
@@ -35,47 +37,120 @@ function addRelatedRecipients(
   }
 }
 
-function statusFlex(request: CarRequestPayload, statusLabel: string, assignment?: {
+/** ชื่อผู้อนุมัติตามประเภทคำขอ */
+function approverLabel(request: CarRequestPayload) {
+  return request.approval_type === 'district_director' ? 'ผู้อำนวยการเขต' : 'หัวหน้าฝ่ายการศึกษา'
+}
+
+/** ปุ่มเปิดเว็บแอปในข้อความแจ้ง Admin (ต้องตั้งค่า env LINE_WEB_APP_URL เมื่อไม่ตั้งจะไม่แสดงปุ่ม) */
+function webAppButton(label: string) {
+  const base = Deno.env.get('LINE_WEB_APP_URL')?.trim().replace(/\/+$/, '')
+  if (!base) return null
+  return { label, uri: base }
+}
+
+type FlexAssignment = {
   carLabel?: string
   driverName?: string
   driverPhone?: string
-}) {
+}
+
+type StatusFlexOptions = {
+  banner?: { text: string; background?: string; color?: string }
+  note?: string
+  button?: { label: string; uri: string } | null
+}
+
+function statusFlex(
+  request: CarRequestPayload,
+  statusLabel: string,
+  assignment?: FlexAssignment,
+  opts?: StatusFlexOptions,
+) {
   const statusColorHex = statusColor(request.status)
   const statusEmojiChar = statusEmoji(request.status)
-  
-  const rows: Record<string, unknown>[] = [
-    { type: 'text', text: `เลขที่เอกสาร: ${request.doc_number || '-'}`, size: 'xs', color: '#6B7280', wrap: true },
-    { type: 'text', text: `ผู้ขอ: ${request.requester_name || '-'}`, size: 'sm', weight: 'bold', wrap: true },
-    { type: 'text', text: `จุดรับ: ${request.pickup_location || '-'}`, size: 'sm', wrap: true },
-    { type: 'text', text: `วัตถุประสงค์: ${request.purpose || '-'}`, size: 'sm', wrap: true },
-    { type: 'text', text: `ปลายทาง: ${request.destination || '-'} (${request.destination_province || '-'})`, size: 'sm', wrap: true },
-    { type: 'text', text: `วันเวลา: ${formatThaiDateTimeRange(request.start_datetime, request.end_datetime)}`, size: 'sm', wrap: true },
-    { type: 'text', text: `ผู้อนุมัติ: ${request.approval_type === 'district_director' ? 'ผู้อำนวยการเขต' : 'หัวหน้าฝ่ายการศึกษา'}`, size: 'xs', color: '#4B5563', wrap: true },
-    {
-      type: 'text',
-      text: `สถานะ: ${statusEmojiChar} ${statusLabel}`,
-      size: 'sm',
-      weight: 'bold',
-      color: statusColorHex,
-      wrap: true,
-    },
-  ]
+
+  const rows: Record<string, unknown>[] = []
+
+  // แถบเน้นด้านบน (เช่น แจ้งยกเลิก) — ช่องแรงสายตาก่อนเนื้อหา
+  if (opts?.banner) {
+    rows.push(
+      bannerRow(opts.banner.text, { background: opts.banner.background, color: opts.banner.color }),
+    )
+  }
+
+  // เนื้อหาแยกเป็น ป้ายกำกับ (ซ้าย ตัวหนา) + ค่า (ขวา ปกติ)
+  rows.push(labelValueRow('เลขที่เอกสาร', request.doc_number || '-'))
+  rows.push(labelValueRow('ผู้ขอ', request.requester_name || '-', { valueWeight: 'bold' }))
+  const department = (request as Record<string, unknown>).requester_department
+  if (department) {
+    rows.push(labelValueRow('สังกัด', String(department)))
+  }
+  rows.push(labelValueRow('จุดรับ', request.pickup_location || '-'))
+  rows.push(
+    labelValueRow(
+      'ปลายทาง',
+      `${request.destination || '-'}${
+        request.destination_province ? ` (${request.destination_province})` : ''
+      }`,
+    ),
+  )
+  rows.push(labelValueRow('วัตถุประสงค์', request.purpose || '-'))
+  rows.push(
+    labelValueRow('วัน-เวลา', formatThaiDateTimeRange(request.start_datetime, request.end_datetime), {
+      valueWeight: 'bold',
+    }),
+  )
+  rows.push(labelValueRow('ผู้อนุมัติ', approverLabel(request)))
 
   if (assignment) {
     rows.push(
       { type: 'separator', margin: 'sm' },
-      { type: 'text', text: `รถที่จัดสรร: ${assignment.carLabel || 'ไม่ระบุรถ'}`, size: 'sm', weight: 'bold', color: '#D97706', wrap: true },
-      { type: 'text', text: `คนขับ: ${assignment.driverName || 'ยังไม่ระบุคนขับ'}${assignment.driverPhone ? ` (${assignment.driverPhone})` : ''}`, size: 'sm', wrap: true },
+      labelValueRow('รถที่จัดสรร', assignment.carLabel || 'ไม่ระบุรถ', {
+        valueWeight: 'bold',
+        valueColor: '#047857',
+      }),
+      labelValueRow(
+        'คนขับ',
+        `${assignment.driverName || 'ยังไม่ระบุคนขับ'}${
+          assignment.driverPhone ? ` (${assignment.driverPhone})` : ''
+        }`,
+      ),
     )
   }
 
+  // โน้ตแนะสำหรับผู้ขอ/ผู้เดินทาง (ธีมเขียวอ่อน)
+  if (opts?.note) {
+    rows.push(bannerRow(opts.note, { background: '#D1FAE5', color: '#047857' }))
+  }
+
+  rows.push(
+    labelValueRow('สถานะ', `${statusEmojiChar} ${statusLabel}`, {
+      valueWeight: 'bold',
+      valueColor: statusColorHex,
+    }),
+  )
+
+  const footer = opts?.button
+    ? {
+        type: 'box',
+        layout: 'vertical',
+        paddingAll: '10px',
+        paddingTop: '0px',
+        contents: [
+          {
+            type: 'button',
+            action: { type: 'uri', label: opts.button.label, uri: opts.button.uri },
+            style: 'primary',
+            color: statusColorHex,
+          },
+        ],
+      }
+    : undefined
+
   return {
     type: 'bubble',
-    styles: {
-      header: {
-        backgroundColor: statusColorHex,
-      },
-    },
+    styles: { header: { backgroundColor: statusColorHex } },
     header: {
       type: 'box',
       layout: 'vertical',
@@ -91,7 +166,8 @@ function statusFlex(request: CarRequestPayload, statusLabel: string, assignment?
         },
       ],
     },
-    body: { type: 'box', layout: 'vertical', spacing: 'sm', contents: rows },
+    body: { type: 'box', layout: 'vertical', spacing: 'xs', contents: rows },
+    ...(footer ? { footer } : {}),
   }
 }
 
@@ -104,22 +180,34 @@ function driverFlex(request: CarRequestPayload, carLabel: string, driverName: st
       layout: 'vertical',
       contents: [
         { type: 'text', text: 'EduLP Car • ใบสั่งงานปฏิบัติหน้าที่', color: '#D1FAE5', size: 'xs', weight: 'bold' },
-        { type: 'text', text: '✅ อนุมัติแล้ว - ใบสั่งงานขับรถ', color: '#FFFFFF', size: 'md', weight: 'bold', wrap: true },
+        { type: 'text', text: '✅ ใบสั่งงานขับรถ — อนุมัติแล้ว', color: '#FFFFFF', size: 'md', weight: 'bold', wrap: true },
       ],
     },
     body: {
       type: 'box',
       layout: 'vertical',
-      spacing: 'sm',
+      spacing: 'xs',
       contents: [
-        { type: 'text', text: `🗓️ กำหนดการ: ${formatThaiDateTimeRange(request.start_datetime, request.end_datetime)}`, size: 'sm', weight: 'bold', wrap: true },
-        { type: 'text', text: `🚘 รถที่ใช้: ${carLabel}`, size: 'sm', color: '#059669', weight: 'bold', wrap: true },
-        { type: 'separator', margin: 'xs' },
-        { type: 'text', text: `📍 จุดรับ (ต้นทาง): ${request.pickup_location || '-'}`, size: 'xs', color: '#4B5563', wrap: true },
-        { type: 'text', text: `🏁 ปลายทาง: ${request.destination || '-'} (${request.destination_province || '-'})`, size: 'xs', color: '#4B5563', wrap: true },
-        { type: 'text', text: `👤 ผู้ประสานงานหน้างาน: ${request.passenger_name || '-'}`, size: 'xs', color: '#1F2937', weight: 'bold', wrap: true },
-        { type: 'text', text: `📞 เบอร์โทรศัพท์: ${request.passenger_phone || '-'}`, size: 'sm', color: '#2563EB', weight: 'bold', wrap: true },
-        { type: 'text', text: `พนักงานขับรถ: ${driverName}`, size: 'sm', color: '#4B5563', wrap: true },
+        labelValueRow('เลขที่เอกสาร', request.doc_number || '-'),
+        labelValueRow('วัน-เวลา', formatThaiDateTimeRange(request.start_datetime, request.end_datetime), {
+          valueWeight: 'bold',
+        }),
+        labelValueRow('จุดรับ (ต้นทาง)', request.pickup_location || '-'),
+        labelValueRow(
+          'ปลายทาง',
+          `${request.destination || '-'}${
+            request.destination_province ? ` (${request.destination_province})` : ''
+          }`,
+        ),
+        labelValueRow('วัตถุประสงค์', request.purpose || '-'),
+        labelValueRow('ผู้ประสานงานหน้างาน', request.passenger_name || '-', { valueWeight: 'bold' }),
+        labelValueRow('เบอร์ติดต่อ', request.passenger_phone || '-', {
+          valueWeight: 'bold',
+          valueColor: '#1D4ED8',
+        }),
+        { type: 'separator', margin: 'sm' },
+        labelValueRow('รถยนต์', carLabel, { valueWeight: 'bold', valueColor: '#047857' }),
+        labelValueRow('พนักงานขับรถ', driverName),
       ],
     },
   }
@@ -353,6 +441,9 @@ Deno.serve(async (req) => {
         driverName: request.external_driver_name || driver?.full_name,
         driverPhone: driver?.phone,
       },
+      {
+        banner: { text: 'คำขอนี้ถูกยกเลิกแล้ว — โปรดเว้นคิวรถ/คนขับที่จัดไว้' },
+      },
     )
     const targets = new Map<string, string>()
     const missingRecipients: string[] = []
@@ -387,9 +478,10 @@ Deno.serve(async (req) => {
   const requestData = request as CarRequestPayload
 
   if (request.status === 'pending' || request.status === 'tentative') {
-    // 🟡 ส่งเฉพาะ LINE ส่วนตัว Admin เท่านั้น (ห้ามส่งเข้ากลุ่ม LINE)
+    // 🟡 ส่งเฉพาะ LINE ส่วนตัว (ผู้ขอ + Admin เท่านั้น — ห้ามส่งเข้ากลุ่ม LINE)
     const targets = new Map<string, string>()
     const missingRecipients: string[] = []
+    const adminNotice: string[] = []
 
     if (request.requester_auth_user_id) {
       const { data: requester, error: requesterError } = await admin
@@ -404,6 +496,26 @@ Deno.serve(async (req) => {
       missingRecipients.push('ผู้ขอ (ไม่พบการเชื่อมบัญชี)')
     }
 
+    // 🟡 แจ้งส่วนตัว Admin ที่เชื่อม LINE แล้ว (พร้อมปุ่มเปิดเว็บแอป)
+    const { data: admins, error: adminsError } = await admin
+      .from('user_profiles')
+      .select('full_name, line_user_id')
+      .eq('role', 'admin')
+      .eq('approval_status', 'approved')
+    if (adminsError) return json({ error: 'Unable to load admin LINE profiles' }, 500)
+    for (const adminRow of admins || []) {
+      if (adminRow.line_user_id && isValidLineId(adminRow.line_user_id)) {
+        targets.set(adminRow.line_user_id, 'แอดมิน')
+      } else {
+        adminNotice.push(`แอดมิน ${adminRow.full_name || '(ไม่ระบุชื่อ)'} ยังไม่ได้เชื่อม LINE`)
+      }
+    }
+
+    const adminButton = webAppButton(
+      request.status === 'tentative'
+        ? 'เปิดแอป • แนบใบลงนาม & อนุมัติ'
+        : 'เปิดแอป • ตรวจสอบ & จัดสรรรถ',
+    )
     addRelatedRecipients(request, targets, missingRecipients)
     const notifications = await Promise.all(
       [...targets].map(async ([recipient, target]) => ({
@@ -411,7 +523,9 @@ Deno.serve(async (req) => {
         result: await pushFlex(
           recipient,
           target === 'ผู้ขอ' ? 'รับคำขอใช้รถเรียบร้อยแล้ว' : 'มีรายการขอใช้รถราชการใหม่',
-          statusFlex(requestData, statusLabel),
+          statusFlex(requestData, statusLabel, undefined, {
+            button: target === 'แอดมิน' ? adminButton : null,
+          }),
         ),
       })),
     )
@@ -419,7 +533,12 @@ Deno.serve(async (req) => {
       missingRecipients.length === 0 &&
       notifications.length > 0 &&
       notifications.every(({ result }) => result.ok)
-    return json({ ok, notifications, missingRecipients })
+    return json({
+      ok,
+      notifications,
+      missingRecipients,
+      adminNotice: adminNotice.length ? adminNotice : undefined,
+    })
   }
 
   const { data: requester, error: requesterError } = await admin
@@ -465,13 +584,24 @@ Deno.serve(async (req) => {
   const missingRecipients: string[] = []
   addRelatedRecipients(request, targets, missingRecipients)
 
+  const isApproved = request.status === 'approved'
+  // 🟢 อนุมัติ: การ์ดกลุ่มเน้นประกาศภาพรวม / การ์ดผู้ขอเน้นแจ้งผล + มาที่จุดรับก่อนเวลา
+  const groupCard = statusFlex(requestData, statusLabel, assignment)
+  const requesterCard = statusFlex(requestData, statusLabel, assignment, isApproved ? {
+    note: '🚶 ผู้เดินทางโปรดมายังจุดรับก่อนเวลาออกรถ 10 นาที',
+  } : undefined)
+
   const notifications = await Promise.all(
     [...targets].map(async ([recipient, target]) => ({
       target,
       result: await pushFlex(
         recipient,
-        request.status === 'approved' ? 'คำขอใช้รถได้รับการอนุมัติแล้ว' : 'อัปเดตสถานะคำขอใช้รถ',
-        statusFlex(requestData, statusLabel, assignment),
+        isApproved
+          ? target === 'กลุ่มฝ่ายการศึกษา'
+            ? 'ประกาศ: อนุมัติและล็อกคิวใช้รถเรียบร้อย'
+            : 'คำขอใช้รถได้รับการอนุมัติแล้ว'
+          : 'อัปเดตสถานะคำขอใช้รถ',
+        isApproved && target === 'กลุ่มฝ่ายการศึกษา' ? groupCard : requesterCard,
       ),
     })),
   )
