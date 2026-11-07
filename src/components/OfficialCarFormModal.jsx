@@ -280,8 +280,8 @@ export function OfficialCarFormModal({ open, onClose, request, car, driver }) {
             </span>
           </div>
 
-          {/* ลงชื่อหัวหน้าฝ่าย - เว้น 3 บรรทัดห่างๆ ก่อนวันเดือนปี และวันเดือนปีอยู่กึ่งกลางเส้นประลงนามพอดี */}
-          <div className="mt-[8mm] relative min-h-[30mm]" style={{ marginLeft: '42%', width: '58%' }}>
+          {/* ลงชื่อหัวหน้าฝ่าย - เว้น 5 บรรทัด สำหรับลงนาม/ประทับตรายาง และวันเดือนปีอยู่กึ่งกลางเส้นประลงนามพอดี */}
+          <div className="mt-[8mm] relative min-h-[40mm]" style={{ marginLeft: '42%', width: '58%' }}>
             <div className="flex items-baseline w-full">
               <span className="shrink-0 whitespace-nowrap">ลงชื่อ</span>
               <div className="relative flex-1 flex items-baseline mx-[4px]">
@@ -290,7 +290,7 @@ export function OfficialCarFormModal({ open, onClose, request, car, driver }) {
                 </span>
                 <div
                   className="absolute flex items-baseline justify-center whitespace-nowrap"
-                  style={{ top: '22mm', left: '50%', transform: 'translateX(-50%)' }}
+                  style={{ top: '32mm', left: '50%', transform: 'translateX(-50%)' }}
                 >
                   <span className="inline-block border-b border-dotted border-black mx-[1.5mm]" style={{ width: '14mm' }}>{'\u00A0'}</span>/
                   <span className="inline-block border-b border-dotted border-black mx-[1.5mm]" style={{ width: '14mm' }}>{'\u00A0'}</span>/
@@ -307,8 +307,8 @@ export function OfficialCarFormModal({ open, onClose, request, car, driver }) {
             อนุญาต และพนักงานขับรถยนต์จัดทำแบบรายงานการใช้รถ (แบบ ๔) ให้เรียบร้อยด้วย
           </div>
 
-          {/* ลงนามผู้มีอำนาจ - เว้น 3 บรรทัดห่างๆ ก่อนวันเดือนปี และวันเดือนปีอยู่กึ่งกลางเส้นประลงนามพอดี */}
-          <div className="mt-[8mm] relative min-h-[30mm]" style={{ marginLeft: '36%', width: '64%' }}>
+          {/* ลงนามผู้มีอำนาจ - เว้น 5 บรรทัด สำหรับลงนาม/ประทับตรายาง และวันเดือนปีอยู่กึ่งกลางเส้นประลงนามพอดี */}
+          <div className="mt-[8mm] relative min-h-[40mm]" style={{ marginLeft: '36%', width: '64%' }}>
             <div className="flex items-baseline w-full">
               <span className="shrink-0 whitespace-nowrap">(ลงนามผู้มีอำนาจสั่งใช้รถ)</span>
               <div className="relative flex-1 flex items-baseline mx-[4px]">
@@ -317,7 +317,7 @@ export function OfficialCarFormModal({ open, onClose, request, car, driver }) {
                 </span>
                 <div
                   className="absolute flex items-baseline justify-center whitespace-nowrap"
-                  style={{ top: '22mm', left: '50%', transform: 'translateX(-50%)' }}
+                  style={{ top: '32mm', left: '50%', transform: 'translateX(-50%)' }}
                 >
                   <span className="inline-block border-b border-dotted border-black mx-[1.5mm]" style={{ width: '14mm' }}>{'\u00A0'}</span>/
                   <span className="inline-block border-b border-dotted border-black mx-[1.5mm]" style={{ width: '14mm' }}>{'\u00A0'}</span>/
