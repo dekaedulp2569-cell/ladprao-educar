@@ -1,7 +1,11 @@
 // Supabase Edge Function: trip-reminders
 // เรียกทุก 5 นาทีด้วย pg_cron เพื่อแจ้งเตือนก่อนเวลาเดินทาง
+//   - 60 นาทีก่อนเริ่ม: แจ้งพนักงานขับรถ (ใบสั่งงานฉบับเต็ม)
 //   - 30 นาทีก่อนเริ่ม: แจ้งพนักงานขับรถ
 //   - 10 นาทีก่อนเริ่ม: แจ้งพนักงานขับรถ และผู้ที่เกี่ยวข้อง
+//
+// 🔔 ตั้งค่าต่องาน: car_requests.reminder_levels ('60','30','10','passenger_10')
+//   แต่ละฉบับจะส่งเฉพาะเมื่องานนั้นเปิดระดับนั้นไว้ (ค่าเริ่มต้น = แจ้งครบทุกฉบับ)
 //
 // ต้องตั้งค่า secrets:
 //   LINE_CHANNEL_ACCESS_TOKEN, CRON_SECRET (แนะนำ)
@@ -59,6 +63,18 @@ const REMINDER_META = {
 } as const
 
 type ReminderType = keyof typeof REMINDER_META
+
+/**
+ * 🔔 ระดับการแจ้งเตือนที่งานนี้เปิดไว้ (ตั้งตอนบันทึกการจัดสรร)
+ * งานประจำอาจปิดบางฉบับไว้ — ถ้าไม่ได้ระบุ/ผิดรูปแบบ ให้แจ้งครบทุกฉบับ (ค่าเริ่มต้นเดิม)
+ */
+function reminderLevels(job: Record<string, unknown>) {
+  const levels = Array.isArray(job.reminder_levels)
+    ? job.reminder_levels.filter((level): level is string => typeof level === 'string')
+    : []
+  if (!levels.length) return ['60', '30', '10', 'passenger_10']
+  return levels
+}
 
 function reminderFlex(
   job: Record<string, unknown>,
@@ -247,7 +263,9 @@ Deno.serve(async (req) => {
     const driverLabel = driver?.full_name || job.external_driver_name || 'ยังไม่ระบุคนขับ'
     const driverLineId = isValidLineId(driver?.line_user_id) ? driver!.line_user_id : ''
 
-    if (minutesUntil <= 60 && driverLineId) {
+    const levels = reminderLevels(job)
+
+    if (levels.includes('60') && minutesUntil <= 60 && driverLineId) {
       results.push({
         request: job.id,
         type: 'driver_60',
@@ -261,7 +279,7 @@ Deno.serve(async (req) => {
       })
     }
 
-    if (minutesUntil <= 30 && driverLineId) {
+    if (levels.includes('30') && minutesUntil <= 30 && driverLineId) {
       results.push({
         request: job.id,
         type: 'driver_30',
@@ -276,7 +294,8 @@ Deno.serve(async (req) => {
     }
 
     if (minutesUntil <= 10) {
-      if (driverLineId) {
+      // 🔴 10 นาทีก่อนออกรถ: แจ้งคนขับ (เฉพาะงานที่เปิดระดับ '10' ไว้)
+      if (levels.includes('10') && driverLineId) {
         results.push({
           request: job.id,
           type: 'driver_10',
@@ -290,24 +309,27 @@ Deno.serve(async (req) => {
         })
       }
 
-      const relatedIds = Array.isArray(job.related_line_user_ids)
-        ? job.related_line_user_ids
-        : []
-      for (const rawId of relatedIds) {
-        if (typeof rawId !== 'string') continue
-        const relatedId = rawId.trim()
-        if (!isValidLineId(relatedId) || relatedId === driverLineId) continue
-        results.push({
-          request: job.id,
-          type: 'related_10',
-          result: await sendOnce(
-            supabase,
-            job.id,
-            'related_10',
-            relatedId,
-            reminderFlex(job, 'related_10', carLabel, driverLabel, driver?.phone),
-          ),
-        })
+      // 🔴 แจ้งผู้เดินทาง (เฉพาะงานที่เปิดระดับ 'passenger_10' ไว้)
+      if (levels.includes('passenger_10')) {
+        const relatedIds = Array.isArray(job.related_line_user_ids)
+          ? job.related_line_user_ids
+          : []
+        for (const rawId of relatedIds) {
+          if (typeof rawId !== 'string') continue
+          const relatedId = rawId.trim()
+          if (!isValidLineId(relatedId) || relatedId === driverLineId) continue
+          results.push({
+            request: job.id,
+            type: 'related_10',
+            result: await sendOnce(
+              supabase,
+              job.id,
+              'related_10',
+              relatedId,
+              reminderFlex(job, 'related_10', carLabel, driverLabel, driver?.phone),
+            ),
+          })
+        }
       }
     }
   }

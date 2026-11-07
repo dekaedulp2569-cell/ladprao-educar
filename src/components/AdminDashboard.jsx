@@ -36,6 +36,23 @@ const STATUS_TABS = [
   { value: 'cancelled', label: 'ยกเลิกแล้ว' },
 ]
 
+// 🔔 การแจ้งเตือนก่อนออกรถ — เลือกได้ต่องาน (ผูกกับคำขอด้วยฟิลด์ reminder_levels)
+// ค่าเริ่มต้น = แจ้งครบทุกฉบับ (เหมือนระบบเดิม) งานประจำอาจเลือกแจ้งน้อยลง
+const DEFAULT_REMINDER_LEVELS = ['60', '30', '10', 'passenger_10']
+
+const REMINDER_LEVEL_OPTIONS = [
+  { key: '60', label: '60 นาทีก่อนออกรถ', hint: 'เตรียมรถที่จุดรับ' },
+  { key: '30', label: '30 นาทีก่อนออกรถ', hint: 'ไปรอที่จุดรับ' },
+  { key: '10', label: '10 นาทีก่อนออกรถ', hint: 'รถพร้อมออก' },
+  { key: 'passenger_10', label: 'แจ้งผู้เดินทาง 10 นาทีก่อนออก', hint: 'ส่วนตัวผู้ขอ/ผู้เกี่ยวข้อง' },
+]
+
+const REMINDER_PRESETS = [
+  { key: 'important', label: '🚨 งานสำคัญ (แจ้งครบ)', levels: DEFAULT_REMINDER_LEVELS },
+  { key: 'routine', label: '🔁 งานประจำ (เฉพาะ 30 นาที)', levels: ['30'] },
+  { key: 'silent', label: '⊘ ไม่ต้องแจ้งเลย', levels: [] },
+]
+
 export function AdminDashboard() {
   const { session } = useAuth()
   const isAdmin = session?.role === 'admin'
@@ -339,13 +356,17 @@ const saveAllocation = async (request, allocation) => {
     }
   }
 
-  // อัปเดตเฉพาะฟิลด์จัดสรร (ไม่แตะ status)
+  // อัปเดตเฉพาะฟิลด์จัดสรร (ไม่แตะ status) + ตั้งค่าการแจ้งเตือนก่อนออกรถของงานนี้
+  const reminderLevels = DEFAULT_REMINDER_LEVELS.filter((level) =>
+    allocation.reminderLevels.includes(level),
+  )
   const saved = await updateRequest(request.id, {
     assigned_car_id: internalCar,
     external_car_info: allocation.carMode === 'external' ? allocation.externalCar.trim() || null : null,
     assigned_driver_id: internalDriver,
     external_driver_name:
       allocation.driverMode === 'external' ? allocation.externalDriver.trim() || null : null,
+    reminder_levels: reminderLevels,
   })
 
   return saved
@@ -850,6 +871,7 @@ function RequestDetail({
     driverMode: 'internal',
     driverId: '',
     externalDriver: '',
+    reminderLevels: DEFAULT_REMINDER_LEVELS,
   })
   // แถบสถานะภายในหน้าต่าง: { tone: 'amber' | 'green', text, sub? }
   // จะแสดงหลังบันทึกการจัดสรร / หลังอนุมัติ — หน้าต่างไม่ปิดเอง ให้ผู้ใช้กดปิดเอง
@@ -865,6 +887,10 @@ function RequestDetail({
       driverMode: request.external_driver_name ? 'external' : 'internal',
       driverId: request.assigned_driver_id || '',
       externalDriver: request.external_driver_name || '',
+      reminderLevels:
+        Array.isArray(request.reminder_levels) && request.reminder_levels.length
+          ? request.reminder_levels
+          : DEFAULT_REMINDER_LEVELS,
     })
     setAllocationStatus(null)
     setApproveStatus(null)
@@ -875,6 +901,26 @@ function RequestDetail({
   const approval = APPROVAL_TYPE[request.approval_type] || APPROVAL_TYPE.head_of_dept
   const car = cars.find((item) => item.id === request.assigned_car_id)
   const driver = drivers.find((item) => item.id === request.assigned_driver_id)
+
+  // 🔔 ตั้งค่าการแจ้งเตือนต่องาน: preset ที่ตรงกับช่องติ๊กปัจจุบัน + เวลาที่จะส่งของแต่ละฉบับ
+  const activePresetKey = REMINDER_PRESETS.find(
+    (preset) =>
+      preset.levels.length === allocation.reminderLevels.length &&
+      preset.levels.every((level) => allocation.reminderLevels.includes(level)),
+  )?.key
+
+  const departure = new Date(request.start_datetime)
+  const reminderTimeText = (minutes) => {
+    if (Number.isNaN(departure.getTime())) return ''
+    const time = new Date(departure.getTime() - minutes * 60_000)
+    return ` (ส่ง ${String(time.getHours()).padStart(2, '0')}:${String(time.getMinutes()).padStart(2, '0')} น.)`
+  }
+  const selectedReminderLabels = REMINDER_LEVEL_OPTIONS.filter((option) =>
+    allocation.reminderLevels.includes(option.key),
+  ).map((option) => option.label)
+  const reminderSummaryText = allocation.reminderLevels.length
+    ? `งานนี้จะส่งแจ้งเตือน ${allocation.reminderLevels.length} ฉบับ: ${selectedReminderLabels.join(' · ')}`
+    : 'งานนี้ไม่ส่งแจ้งซ้ำก่อนออกรถ (คนขับยังได้ใบสั่งงานตอนอนุมัติ + สรุปประจำวันตามปกติ)'
 
   const submitAllocation = async () => {
     setAllocationStatus(null)
@@ -1009,7 +1055,7 @@ const handleApprove = async () => {
                     checked={allocation.carMode === 'internal'}
                     onChange={() => setAllocation({ ...allocation, carMode: 'internal' })}
                   />
-                  รถฝ่ายเรา
+                  รถในระบบ
                 </label>
                 <label className="inline-flex items-center gap-1.5">
                   <input
@@ -1017,7 +1063,7 @@ const handleApprove = async () => {
                     checked={allocation.carMode === 'external'}
                     onChange={() => setAllocation({ ...allocation, carMode: 'external' })}
                   />
-                  รถยืมฝ่ายอื่น
+                  รถไม่มีในระบบ (กรอกเอง)
                 </label>
               </div>
               {allocation.carMode === 'internal' ? (
@@ -1037,7 +1083,7 @@ const handleApprove = async () => {
                 <input
                   value={allocation.externalCar}
                   onChange={(event) => setAllocation({ ...allocation, externalCar: event.target.value })}
-                  placeholder="ระบุรถที่ยืม เช่น รถตู้ฝ่ายคลัง ทะเบียน 1กข 1234"
+                  placeholder="ระบุรถที่ไม่มีในระบบ เช่น รถตู้ยืมจากหน่วยงานอื่น ทะเบียน 1กข 1234"
                   className={selectClass}
                 />
               )}
@@ -1052,7 +1098,7 @@ const handleApprove = async () => {
                     checked={allocation.driverMode === 'internal'}
                     onChange={() => setAllocation({ ...allocation, driverMode: 'internal' })}
                   />
-                  คนขับฝ่ายเรา
+                  คนขับในระบบ
                 </label>
                 <label className="inline-flex items-center gap-1.5">
                   <input
@@ -1060,7 +1106,7 @@ const handleApprove = async () => {
                     checked={allocation.driverMode === 'external'}
                     onChange={() => setAllocation({ ...allocation, driverMode: 'external' })}
                   />
-                  คนขับฝ่ายอื่น
+                  คนขับไม่มีในระบบ (กรอกเอง)
                 </label>
               </div>
               {allocation.driverMode === 'internal' ? (
@@ -1092,10 +1138,67 @@ const handleApprove = async () => {
                 <input
                   value={allocation.externalDriver}
                   onChange={(event) => setAllocation({ ...allocation, externalDriver: event.target.value })}
-                  placeholder="ระบุชื่อพนักงานขับรถจากฝ่ายอื่น"
+                  placeholder="ระบุชื่อพนักงานขับรถที่ไม่มีในระบบ"
                   className={selectClass}
                 />
               )}
+            </div>
+
+            {/* 🔔 เลือกการแจ้งเตือนก่อนออกรถ (ผูกกับงานนี้ — งานประจำปิดบางฉบับได้) */}
+            <div className="rounded-xl border border-amber-200 bg-amber-50/60 p-3">
+              <p className="text-xs font-bold text-amber-800">
+                🔔 การแจ้งเตือนก่อนออกรถ (เลือกตามความสำคัญของงาน)
+              </p>
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {REMINDER_PRESETS.map((preset) => (
+                  <button
+                    key={preset.key}
+                    type="button"
+                    onClick={() => setAllocation({ ...allocation, reminderLevels: preset.levels })}
+                    className={classNames(
+                      'rounded-full border px-2.5 py-1 text-[11px] font-semibold transition',
+                      activePresetKey === preset.key
+                        ? 'border-amber-700 bg-amber-700 text-white'
+                        : 'border-slate-300 bg-white text-slate-600 hover:bg-amber-100',
+                    )}
+                  >
+                    {preset.label}
+                  </button>
+                ))}
+              </div>
+              <div className="mt-2 grid gap-1.5 sm:grid-cols-2">
+                {REMINDER_LEVEL_OPTIONS.map((option) => {
+                  const checked = allocation.reminderLevels.includes(option.key)
+                  return (
+                    <label key={option.key} className="flex items-start gap-2 text-xs text-slate-700">
+                      <input
+                        type="checkbox"
+                        className="mt-0.5"
+                        checked={checked}
+                        onChange={() =>
+                          setAllocation({
+                            ...allocation,
+                            reminderLevels: checked
+                              ? allocation.reminderLevels.filter((level) => level !== option.key)
+                              : [...allocation.reminderLevels, option.key],
+                          })
+                        }
+                      />
+                      <span>
+                        <b>{option.label}</b> <span className="text-slate-400">— {option.hint}</span>
+                        {checked ? (
+                          <span className="block text-[10.5px] text-slate-400">
+                            {reminderTimeText(option.key === 'passenger_10' ? 10 : Number(option.key))}
+                          </span>
+                        ) : null}
+                      </span>
+                    </label>
+                  )
+                })}
+              </div>
+              <p className="mt-2 text-[11px] leading-relaxed text-amber-700">
+                {reminderSummaryText} — แก้ไขได้ทุกเมื่อด้วยการบันทึกการจัดสรรซ้ำ
+              </p>
             </div>
 
             <button
