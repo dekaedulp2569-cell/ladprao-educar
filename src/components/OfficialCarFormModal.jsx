@@ -15,7 +15,6 @@ export function OfficialCarFormModal({ open, onClose, request, car, driver }) {
       ? recipientSelection.value
       : defaultRecipient
 
-  // แยกส่วนประกอบวันเวลาไทย
   const reqParts = useMemo(
     () => bangkokParts(request?.request_date || request?.created_at),
     [request?.request_date, request?.created_at],
@@ -75,7 +74,7 @@ export function OfficialCarFormModal({ open, onClose, request, car, driver }) {
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/70 p-2 sm:p-4 print:static print:p-0 print:bg-white">
-      {/* ส่วนควบคุม Modal (ซ่อนตอนพิมพ์) */}
+      {/* ส่วนควบคุม Modal */}
       <div className="mx-auto mb-3 flex max-w-4xl items-center justify-between gap-3 rounded-2xl bg-white px-4 py-3 shadow-lg print:hidden">
         <div className="flex items-center gap-2">
           <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-100 text-lg">📄</span>
@@ -110,32 +109,31 @@ export function OfficialCarFormModal({ open, onClose, request, car, driver }) {
         </div>
       </div>
 
-      {/* แผ่นกระดาษเอกสาร A4 จำลอง */}
+      {/* แผ่นกระดาษ A4 จำลอง */}
       <div className="overflow-x-auto pb-8 print:p-0">
         <div
           className="mx-auto bg-white text-black shadow-2xl print:shadow-none"
           style={{
             width: '210mm',
-            minHeight: '297mm',
-            padding: '18mm 20mm 15mm 25mm',
+            height: '297mm',
+            maxHeight: '297mm',
+            overflow: 'hidden',
+            padding: '15mm 20mm 12mm 25mm',
             boxSizing: 'border-box',
             fontFamily: '"TH Sarabun New", "TH SarabunPSK", "Sarabun", sans-serif',
             fontSize: '16pt',
-            lineHeight: 1.45,
+            lineHeight: 1.4,
           }}
         >
-          {/* มุมขวาบน: แบบ ๓ */}
-          <div className="text-right font-bold text-[16pt] leading-none mb-[2mm]">
+          <div className="text-right font-bold text-[16pt] leading-none mb-[1mm]">
             แบบ ๓
           </div>
 
-          {/* ชื่อเอกสาร */}
-          <h1 className="text-center font-bold text-[20pt] leading-tight mb-[3mm]">
+          <h1 className="text-center font-bold text-[20pt] leading-tight mb-[2mm]">
             ใบขออนุญาตใช้รถส่วนกลาง
           </h1>
 
-          {/* วันที่ เดือน พ.ศ. */}
-          <div className="flex items-baseline mb-[2mm] min-h-[7.2mm]" style={{ marginLeft: '50%' }}>
+          <div className="flex items-baseline mb-[1mm] min-h-[7mm]" style={{ marginLeft: '50%' }}>
             <span className="shrink-0 whitespace-nowrap">วันที่</span>
             <span className="border-b border-dotted border-black text-center px-1 pb-[1px]" style={{ width: '14mm' }}>
               {reqDay || '\u00A0'}
@@ -150,14 +148,12 @@ export function OfficialCarFormModal({ open, onClose, request, car, driver }) {
             </span>
           </div>
 
-          {/* เรียน */}
-          <div className="flex items-baseline mb-[2mm] min-h-[7.2mm]">
+          <div className="flex items-baseline mb-[1mm] min-h-[7mm]">
             <span className="shrink-0 whitespace-nowrap">เรียน</span>
             <span className="ml-[10px]">{recipient}</span>
           </div>
 
-          {/* ข้าพเจ้า / ตำแหน่ง */}
-          <div className="flex items-baseline min-h-[7.2mm]" style={{ paddingLeft: '25mm' }}>
+          <div className="flex items-baseline min-h-[7mm]" style={{ paddingLeft: '25mm' }}>
             <span className="shrink-0 whitespace-nowrap">ข้าพเจ้า</span>
             <span className="flex-[1.1] border-b border-dotted border-black text-center px-1 pb-[1px] min-w-0">
               {requesterName || '\u00A0'}
@@ -168,31 +164,27 @@ export function OfficialCarFormModal({ open, onClose, request, car, driver }) {
             </span>
           </div>
 
-          {/* ขออนุญาตใช้รถ (ไปที่ไหน) - บรรทัด ๑ */}
-          <div className={`flex items-baseline min-h-[7.2mm] ${isDestLong ? 'text-[15pt]' : ''}`}>
+          <div className={`flex items-baseline min-h-[7mm] ${isDestLong ? 'text-[15pt]' : ''}`}>
             <span className="shrink-0 whitespace-nowrap">ขออนุญาตใช้รถ (ไปที่ไหน)</span>
             <span className="flex-1 border-b border-dotted border-black text-left px-1 pb-[1px] min-w-0">
               {destLines.line1 || '\u00A0'}
             </span>
           </div>
 
-          {/* ขออนุญาตใช้รถ (ไปที่ไหน) - บรรทัด ๒ */}
-          <div className={`flex items-baseline min-h-[7.2mm] ${isDestLong ? 'text-[15pt]' : ''}`}>
+          <div className={`flex items-baseline min-h-[7mm] ${isDestLong ? 'text-[15pt]' : ''}`}>
             <span className="flex-1 border-b border-dotted border-black text-left px-1 pb-[1px] min-w-0">
               {destLines.line2 || '\u00A0'}
             </span>
           </div>
 
-          {/* เพื่อ - บรรทัด ๑ */}
-          <div className={`flex items-baseline min-h-[7.2mm] ${isPurposeLong ? 'text-[15pt]' : ''}`}>
+          <div className={`flex items-baseline min-h-[7mm] ${isPurposeLong ? 'text-[15pt]' : ''}`}>
             <span className="shrink-0 whitespace-nowrap">เพื่อ</span>
             <span className="flex-1 border-b border-dotted border-black text-left px-1 pb-[1px] min-w-0">
               {purposeLines.line1 || '\u00A0'}
             </span>
           </div>
 
-          {/* เพื่อ - บรรทัด ๒ + มีคนนั่ง ... คน */}
-          <div className={`flex items-baseline min-h-[7.2mm] ${isPurposeLong ? 'text-[15pt]' : ''}`}>
+          <div className={`flex items-baseline min-h-[7mm] ${isPurposeLong ? 'text-[15pt]' : ''}`}>
             <span className="flex-1 border-b border-dotted border-black text-left px-1 pb-[1px] min-w-0">
               {purposeLines.line2 || '\u00A0'}
             </span>
@@ -203,8 +195,7 @@ export function OfficialCarFormModal({ open, onClose, request, car, driver }) {
             <span className="shrink-0 whitespace-nowrap ml-[6px]">คน</span>
           </div>
 
-          {/* ในวันที่ ... เวลา ... น. */}
-          <div className="flex items-baseline min-h-[7.2mm]">
+          <div className="flex items-baseline min-h-[7mm]">
             <span className="shrink-0 whitespace-nowrap">ในวันที่</span>
             <span className="flex-1 border-b border-dotted border-black text-center px-1 pb-[1px] min-w-0">
               {startDateStr || '\u00A0'}
@@ -216,8 +207,7 @@ export function OfficialCarFormModal({ open, onClose, request, car, driver }) {
             <span className="shrink-0 whitespace-nowrap ml-[6px]">น.</span>
           </div>
 
-          {/* ถึงวันที่ ... เวลา ... น. */}
-          <div className="flex items-baseline min-h-[7.2mm]">
+          <div className="flex items-baseline min-h-[7mm]">
             <span className="shrink-0 whitespace-nowrap">ถึงวันที่</span>
             <span className="flex-1 border-b border-dotted border-black text-center px-1 pb-[1px] min-w-0">
               {endDateStr || '\u00A0'}
@@ -229,8 +219,8 @@ export function OfficialCarFormModal({ open, onClose, request, car, driver }) {
             <span className="shrink-0 whitespace-nowrap ml-[6px]">น.</span>
           </div>
 
-          {/* ลายเซ็นผู้ขออนุญาต: ลายเซ็น / ชื่อในวงเล็บ / ตำแหน่ง / สังกัด */}
-          <div className="flex justify-end w-full mt-[5mm]">
+          {/* ลายเซ็นผู้ขออนุญาต */}
+          <div className="flex justify-end w-full mt-[4mm]">
             <div className="flex flex-col items-end">
               <div className="flex items-baseline justify-end whitespace-nowrap">
                 <span className="border-b border-dotted border-black inline-block" style={{ width: '60mm', height: '1em' }}>
@@ -238,11 +228,11 @@ export function OfficialCarFormModal({ open, onClose, request, car, driver }) {
                 </span>
                 <span className="shrink-0 whitespace-nowrap ml-[6px]">ผู้ขออนุญาต</span>
               </div>
-              <div className="text-center mt-[1mm] leading-[1.35]" style={{ width: '60mm', marginRight: '22mm' }}>
+              <div className="text-center mt-[0.5mm] leading-[1.3]" style={{ width: '60mm', marginRight: '22mm' }}>
                 (&nbsp;{requesterName || '............................................................'}&nbsp;)
               </div>
               <div
-                className={`text-center border-b border-dotted border-black mt-[1mm] leading-[1.35] ${
+                className={`text-center border-b border-dotted border-black mt-[0.5mm] leading-[1.3] ${
                   requesterPosition.length > 25 ? 'text-[15pt]' : ''
                 }`}
                 style={{ width: '60mm', marginRight: '22mm' }}
@@ -250,7 +240,7 @@ export function OfficialCarFormModal({ open, onClose, request, car, driver }) {
                 {requesterPosition || '\u00A0'}
               </div>
               <div
-                className={`text-center border-b border-dotted border-black mt-[1mm] leading-[1.35] ${
+                className={`text-center border-b border-dotted border-black mt-[0.5mm] leading-[1.3] ${
                   requesterDepartment.length > 25 ? 'text-[15pt]' : ''
                 }`}
                 style={{ width: '60mm', marginRight: '22mm' }}
@@ -260,8 +250,8 @@ export function OfficialCarFormModal({ open, onClose, request, car, driver }) {
             </div>
           </div>
 
-          {/* ส่วนระบุรถและพนักงานขับรถ: ขยายความกว้างประเภทรถเพื่อรองรับ "รถโดยสาร ๑๒ ที่นั่ง (ตู้)" */}
-          <div className="flex items-baseline min-h-[7.2mm] mt-[6mm]">
+          {/* ข้อมูลรถ */}
+          <div className="flex items-baseline min-h-[7mm] mt-[5mm]">
             <span className="shrink-0 whitespace-nowrap">รถยนต์</span>
             <span
               className={`border-b border-dotted border-black text-center px-1 pb-[1px] ${
@@ -277,22 +267,22 @@ export function OfficialCarFormModal({ open, onClose, request, car, driver }) {
             </span>
           </div>
 
-          <div className="flex items-baseline min-h-[7.2mm]">
+          <div className="flex items-baseline min-h-[7mm]">
             <span className="shrink-0 whitespace-nowrap">พนักงานขับรถยนต์</span>
             <span className="flex-1 border-b border-dotted border-black text-center px-1 pb-[1px] min-w-0">
               {driverName || '\u00A0'}
             </span>
           </div>
 
-          {/* ส่วนลงชื่อหัวหน้าฝ่าย: เว้น 2 บรรทัดก่อนหน้า และ 4 บรรทัดสำหรับลงนาม วันที่ตรงกับเส้นประ */}
-          <div className="mt-[10mm]" style={{ marginLeft: '42%', width: '58%' }}>
+          {/* ลงชื่อหัวหน้าฝ่าย - เว้น 2 บรรทัดก่อน, 4 บรรทัดว่างสำหรับประทับตราและลงนาม, แล้ววันเดือนปี */}
+          <div className="mt-[8mm]" style={{ marginLeft: '42%', width: '58%' }}>
             <div className="flex items-baseline w-full">
               <span className="shrink-0 whitespace-nowrap">ลงชื่อ</span>
               <div className="flex-1 flex flex-col items-center min-w-[50mm]">
                 <span className="w-full border-b border-dotted border-black inline-block" style={{ height: '1.2em' }}>
                   {'\u00A0'}
                 </span>
-                <div className="flex items-baseline justify-center whitespace-nowrap mt-[20mm]">
+                <div className="flex items-baseline justify-center whitespace-nowrap mt-[18mm]">
                   <span className="inline-block border-b border-dotted border-black mx-[1.5mm]" style={{ width: '14mm' }}>{'\u00A0'}</span>/
                   <span className="inline-block border-b border-dotted border-black mx-[1.5mm]" style={{ width: '14mm' }}>{'\u00A0'}</span>/
                   <span className="inline-block border-b border-dotted border-black mx-[1.5mm]" style={{ width: '14mm' }}>{'\u00A0'}</span>
@@ -303,20 +293,20 @@ export function OfficialCarFormModal({ open, onClose, request, car, driver }) {
             </div>
           </div>
 
-          {/* ข้อความคำสั่ง (ตัวหนา) */}
-          <div className="mt-[8mm] text-center text-[16pt] leading-normal font-bold">
+          {/* คำสั่ง (ตัวหนา) */}
+          <div className="mt-[6mm] text-center text-[16pt] leading-normal font-bold">
             อนุญาต และพนักงานขับรถยนต์จัดทำแบบรายงานการใช้รถ (แบบ ๔) ให้เรียบร้อยด้วย
           </div>
 
-          {/* ส่วนลงนามผู้มีอำนาจสั่งใช้รถ: เว้น 2 บรรทัดก่อนหน้า และ 4 บรรทัดสำหรับลงนาม วันที่ตรงกับเส้นประ */}
-          <div className="mt-[10mm]" style={{ marginLeft: '36%', width: '64%' }}>
+          {/* ลงนามผู้มีอำนาจ - เว้น 2 บรรทัดก่อน, 4 บรรทัดว่างสำหรับประทับตราและลงนาม, แล้ววันเดือนปี */}
+          <div className="mt-[8mm]" style={{ marginLeft: '36%', width: '64%' }}>
             <div className="flex items-baseline w-full">
               <span className="shrink-0 whitespace-nowrap">(ลงนามผู้มีอำนาจสั่งใช้รถ)</span>
               <div className="flex-1 flex flex-col items-center min-w-[50mm]">
                 <span className="w-full border-b border-dotted border-black inline-block" style={{ height: '1.2em' }}>
                   {'\u00A0'}
                 </span>
-                <div className="flex items-baseline justify-center whitespace-nowrap mt-[20mm]">
+                <div className="flex items-baseline justify-center whitespace-nowrap mt-[18mm]">
                   <span className="inline-block border-b border-dotted border-black mx-[1.5mm]" style={{ width: '14mm' }}>{'\u00A0'}</span>/
                   <span className="inline-block border-b border-dotted border-black mx-[1.5mm]" style={{ width: '14mm' }}>{'\u00A0'}</span>/
                   <span className="inline-block border-b border-dotted border-black mx-[1.5mm]" style={{ width: '14mm' }}>{'\u00A0'}</span>
