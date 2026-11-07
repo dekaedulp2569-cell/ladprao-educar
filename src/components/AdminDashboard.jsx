@@ -961,10 +961,8 @@ function RequestDetail({
     : 'งานนี้ไม่ส่งแจ้งซ้ำก่อนออกรถ (คนขับยังได้ใบสั่งงานตอนอนุมัติ + สรุปประจำวันตามปกติ)'
 
   // 🚦 ตรวจสดการใช้งานซ้ำซ้อน: รถ/คนขับที่เลือก เทียบกับงานทุกสถานะที่จัดสรรไว้แล้ว (ช่วงเวลาทับกัน)
-  const allocationConflicts = useMemo(
-    () => findAllocationConflicts(request, allocation, allRequests),
-    [request, allocation, allRequests],
-  )
+  // เรียกตรง (ไม่ใช้ useMemo) — hook ห้ามอยู่หลัง early return ของ component
+  const allocationConflicts = findAllocationConflicts(request, allocation, allRequests)
   const carConflicts = allocationConflicts.filter((entry) => entry.carClash)
   const driverConflicts = allocationConflicts.filter((entry) => entry.driverClash)
 
