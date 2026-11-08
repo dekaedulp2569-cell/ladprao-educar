@@ -7,7 +7,7 @@ import { CarRequestForm } from './components/CarRequestForm'
 import { MyRequests } from './components/MyRequests'
 import { AdminDashboard } from './components/AdminDashboard'
 import { DriverSchedule } from './components/DriverSchedule'
-import { Card } from './components/ui'
+import { Card, ContactHelp } from './components/ui'
 
 function App() {
   const { session, canManage, logout, authLoading, isApproved } = useAuth()
@@ -61,6 +61,14 @@ function App() {
               ? 'ระบบรับข้อมูลบัญชี LINE แล้ว กรุณารอผู้ดูแลตรวจสอบและกำหนดสิทธิ์ก่อนเข้าใช้งาน'
               : 'กรุณาติดต่อผู้ดูแลระบบหากคิดว่าสถานะบัญชีไม่ถูกต้อง'}
           </p>
+          <ContactHelp
+            subtitle={
+              session.approvalStatus === 'pending'
+                ? 'สอบถามความคืบหน้าหรือแก้ไขข้อมูลบัญชี'
+                : 'ติดต่อผู้ดูแลระบบ'
+            }
+            className="mt-4"
+          />
           {session.approvalStatus === 'pending' ? (
             <button
               type="button"
@@ -121,6 +129,7 @@ function App() {
             หน้านี้สำหรับเจ้าหน้าที่ผู้จัดการรถและหัวหน้าฝ่ายการศึกษาเท่านั้น
             ปัจจุบันคุณเข้าสู่ระบบในบทบาท {ROLE[session.role]}
           </p>
+          <ContactHelp subtitle="ขอสิทธิ์เพิ่มหรือเปลี่ยนบทบาท" className="mt-4" />
           <button
             type="button"
             onClick={() => void handleLogout()}

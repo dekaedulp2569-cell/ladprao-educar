@@ -114,6 +114,25 @@ export function Modal({ open, onClose, title, children, footer, size = 'md' }) {
   )
 }
 
+/** กล่องโทรติดต่อสำหรับหน้า Login/ตรวจสิทธิ์ — ข้อความเบอร์และลิงก์กำหนดที่เดียว (ใช้ร่วมทุกจุด) */
+export function ContactHelp({ subtitle = 'สอบถามเพิ่มเติม', className }) {
+  return (
+    <div className={classNames('rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-center', className)}>
+      {subtitle ? <p className="text-[11px] font-medium text-blue-500">{subtitle}</p> : null}
+      <p className="mt-0.5 text-sm font-semibold text-blue-800">
+        📞{' '}
+        <a href="tel:025398247" className="underline decoration-dotted underline-offset-2">
+          02 539 8247
+        </a>{' '}
+        หรือโทร.{' '}
+        <a href="tel:6928" className="underline decoration-dotted underline-offset-2">
+          6928
+        </a>
+      </p>
+    </div>
+  )
+}
+
 export function Alert({ tone = 'info', children }) {
   const tones = {
     info: 'border-brand-200 bg-brand-50 text-brand-800',
