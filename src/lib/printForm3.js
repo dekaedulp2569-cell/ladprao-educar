@@ -1,4 +1,3 @@
-import html2pdf from 'html2pdf.js'
 import fontRegularUrl from '../assets/fonts/THSarabunIT9-Regular.ttf'
 import fontBoldUrl from '../assets/fonts/THSarabunIT9-Bold.ttf'
 import fontItalicUrl from '../assets/fonts/THSarabunIT9-Italic.ttf'
@@ -536,12 +535,17 @@ export function generateForm3Html(request, car, driver, recipient) {
           const pdfFile = new File([pdfBlob], 'แบบ๓_ใบขออนุญาตใช้รถส่วนกลาง.pdf', { type: 'application/pdf' });
 
           const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-          if (isMobile && navigator.canShare && navigator.canShare({ files: [pdfFile] })) {
+          const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+          let canShare = false;
+          if (isMobile && navigator.canShare) {
+            try { canShare = navigator.canShare({ files: [pdfFile] }); } catch (shareCheckErr) { canShare = false; }
+          }
+          if (canShare) {
             try {
               await navigator.share({
                 files: [pdfFile],
                 title: 'แบบ ๓ ใบขออนุญาตใช้รถส่วนกลาง',
-                text: 'แบบ ๓ ใบขออนุญาตใช้รถส่วนกลาง (ฟอนต์ TH Sarabun IT๙)',
+                text: 'แบบ ๓ ใบขออนุญาตใช้รถส่วนกลาง (ฟอนต์ TH Sarabun IT9)',
               });
               btn.innerHTML = originalText;
               btn.disabled = false;
@@ -552,10 +556,22 @@ export function generateForm3Html(request, car, driver, recipient) {
                 btn.disabled = false;
                 return;
               }
+              // แชร์ล้มเหลว → ตกลงไปทางดาวน์โหลด/พรีวิวด้านล่าง
             }
           }
 
           const url = URL.createObjectURL(pdfBlob);
+          // ทางถอยฉุกเฉิน iOS: ดาวน์โหลดตรงมักล้มเงียบไม่ได้ไฟล์ → เปิดหน้าพรีวิว PDF ให้กดแชร์/บันทึกเอง
+          if (isIOS) {
+            var previewWindow = window.open(url, '_blank');
+            if (previewWindow) {
+              alert('ระบบเปิดไฟล์ PDF ในแท็บใหม่แล้ว — กดปุ่มแชร์ (⬆️) แล้วเลือก "บันทึกลงไฟล์" เพื่อเก็บเอกสารไว้ในเครื่อง');
+              setTimeout(function () { URL.revokeObjectURL(url); }, 60000);
+              btn.innerHTML = originalText;
+              btn.disabled = false;
+              return;
+            }
+          }
           const a = document.createElement('a');
           a.href = url;
           a.download = 'แบบ๓_ใบขออนุญาตใช้รถส่วนกลาง.pdf';
@@ -597,8 +613,72 @@ export function openForm3PrintWindow(request, car, driver, recipient) {
 }
 
 /**
+ * ส่งมอบไฟล์ PDF ให้ผู้ใช้ตามความสามารถของเครื่อง:
+ * 1) มือถือ: เด้งหน้าต่าง "แชร์" ของเครื่องก่อน (iOS กด "บันทึกลงไฟล์" / ส่งเข้า LINE ได้)
+ * 2) คอมพิวเตอร์: บันทึกตรงเข้าไฟล์ .pdf
+ * 3) iOS ที่ไม่รองรับแชร์ (เช่นบางเครื่องใน LINE WebView): วิธีดาวน์โหลดตรงมักล้มเงียบไม่ได้ไฟล์
+ *    → เปิดไฟล์ PDF ขึ้นหน้าพรีวิวแท็บใหม่ ให้ผู้ใช้กดปุ่มแชร์/บันทึกจากหน้าเครื่องเอง (ใช้ได้เสมอ)
+ */
+async function deliverForm3PdfFile(pdfBlob, filename) {
+  const pdfFile = new File([pdfBlob], filename, { type: 'application/pdf' })
+  const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)
+
+  let supportsShare = false
+  if (isMobile && navigator.canShare) {
+    try {
+      supportsShare = navigator.canShare({ files: [pdfFile] })
+    } catch (shareCheckErr) {
+      supportsShare = false
+    }
+  }
+
+  if (supportsShare) {
+    try {
+      await navigator.share({
+        files: [pdfFile],
+        title: 'แบบ ๓ ใบขออนุญาตใช้รถส่วนกลาง',
+        text: 'เอกสารแบบ ๓ ใบขออนุญาตใช้รถส่วนกลาง (ฟอนต์ TH Sarabun IT9)',
+      })
+      return true
+    } catch (shareErr) {
+      // ผู้ใช้กดปิด/ยกเลิกหน้าแชร์เอง = ส่งมอบเสร็จ ไม่ต้องใช้ทางเลือกอื่น
+      if (shareErr?.name === 'AbortError') return true
+      console.warn('Share API failed, falling back to browser download:', shareErr)
+    }
+  }
+
+  const url = URL.createObjectURL(pdfBlob)
+
+  // ทางถอยฉุกเฉิน iOS: เปิดหน้าพรีวิว PDF ให้กดบันทึก/แชร์เอง (หน้าวิวเวอร์ของเครื่องมีปุ่มให้เสมอ)
+  if (!supportsShare && /iPhone|iPad|iPod/i.test(navigator.userAgent)) {
+    const previewWindow = window.open(url, '_blank')
+    if (previewWindow) {
+      window.alert(
+        'ระบบเปิดไฟล์ PDF ในแท็บใหม่แล้ว — กดปุ่มแชร์ (สัญลักษณ์ ⬆️) แล้วเลือก "บันทึกลงไฟล์" เพื่อเก็บเอกสารไว้ในเครื่อง',
+      )
+      setTimeout(() => URL.revokeObjectURL(url), 60000)
+      return true
+    }
+    // window.open ถูกบล็อก (popup blocker) → ตกลงไปทางดาวน์โหลดตรงด้านล่างเป็นทางสุดท้าย
+  }
+
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  document.body.appendChild(a)
+  a.click()
+  setTimeout(() => {
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+  }, 1500)
+  return true
+}
+
+/**
  * ฟังก์ชันสร้างและดาวน์โหลดไฟล์ PDF โดยตรงบนโทรศัพท์มือถือและเดสก์ท็อป
- * ใช้ฟอนต์ TH Sarabun IT๙ ตามมาตรฐาน
+ * ใช้ฟอนต์ TH Sarabun IT9 ตามมาตรฐาน
+ * หมายเหตุ: html2pdf.js (~940KB) ถูกโหลดแบบ dynamic import — เฉพาะตอนผู้ใช้กดดาวน์โหลด PDF เท่านั้น
+ * (ไฟล์หลักของเว็บจึงเล็กลง ~940KB เปิดเว็บบนมือถือเร็วขึ้น)
  */
 export async function downloadForm3AsPdf(element, filename = 'แบบ๓_ใบขออนุญาตใช้รถส่วนกลาง.pdf') {
   if (!element) return false
@@ -626,36 +706,11 @@ export async function downloadForm3AsPdf(element, filename = 'แบบ๓_ใ�
   }
 
   try {
+    const { default: html2pdf } = await import('html2pdf.js')
     const worker = html2pdf().set(opt).from(element)
     const pdfBlob = await worker.output('blob')
-    const pdfFile = new File([pdfBlob], filename, { type: 'application/pdf' })
 
-    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)
-    if (isMobile && navigator.canShare && navigator.canShare({ files: [pdfFile] })) {
-      try {
-        await navigator.share({
-          files: [pdfFile],
-          title: 'แบบ ๓ ใบขออนุญาตใช้รถส่วนกลาง',
-          text: 'เอกสารแบบ ๓ ใบขออนุญาตใช้รถส่วนกลาง (ฟอนต์ TH Sarabun IT๙)',
-        })
-        return true
-      } catch (shareErr) {
-        if (shareErr.name === 'AbortError') return true
-        console.warn('Share API cancelled or failed, falling back to download:', shareErr)
-      }
-    }
-
-    const url = URL.createObjectURL(pdfBlob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = filename
-    document.body.appendChild(a)
-    a.click()
-    setTimeout(() => {
-      document.body.removeChild(a)
-      URL.revokeObjectURL(url)
-    }, 1500)
-
+    await deliverForm3PdfFile(pdfBlob, filename)
     return true
   } catch (err) {
     console.error('Error generating PDF:', err)
