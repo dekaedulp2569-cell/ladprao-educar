@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
-import { APPROVAL_TYPE, STATUS, formatDate, formatDateTimeRange } from '../lib/helpers'
+import { APPROVAL_TYPE, STATUS, carTypeDisplay, formatDate, formatDateTimeRange } from '../lib/helpers'
 import { notifyLine } from '../lib/line'
-import { Card, EmptyState, SectionTitle, Spinner, StatusBadge, StatusLegend } from './ui'
+import { Card, EmptyState, Modal, SectionTitle, Spinner, StatusBadge, StatusLegend } from './ui'
 import { NotificationPopup } from './NotificationPopup'
 import { OfficialCarFormModal } from './OfficialCarFormModal'
 import { openForm3PrintWindow } from '../lib/printForm3'
@@ -18,13 +18,11 @@ export function MyRequests() {
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
   const [cancellingId, setCancellingId] = useState(null)
+  // คำขอที่ผู้ใช้กดยกเลิก — รอการยืนยันในหน้าต่าง Modal สวย ๆ (แทน window.confirm)
+  // ไม่มีช่องเหตุผลตามข้อกำหนด (ไม่ต้องแตะ SQL)
+  const [cancelTarget, setCancelTarget] = useState(null)
 
   const cancelApprovedRequest = async (request) => {
-    const confirmed = window.confirm(
-      `ยืนยันยกเลิกคำขอใช้รถเลขที่ ${request.doc_number || '-'} ที่ได้รับอนุมัติแล้วหรือไม่?\nระบบจะแจ้งผู้ขอ คนขับที่ได้รับมอบหมาย และกลุ่มฝ่ายการศึกษา`,
-    )
-    if (!confirmed) return
-
     setError('')
     setCancellingId(request.id)
     const { data: cancelledRequest, error: cancelError } = await supabase
@@ -39,11 +37,13 @@ export function MyRequests() {
     if (cancelError) {
       setError(`ยกเลิกคำขอไม่สำเร็จ: ${cancelError.message}`)
       setCancellingId(null)
+      setCancelTarget(null)
       return
     }
     if (!cancelledRequest) {
       setError('ยกเลิกคำขอไม่สำเร็จ: รายการนี้ไม่อยู่ในสถานะอนุมัติแล้ว หรือบัญชีนี้ไม่มีสิทธิ์')
       setCancellingId(null)
+      setCancelTarget(null)
       return
     }
 
@@ -52,6 +52,7 @@ export function MyRequests() {
       current.map((item) => (item.id === request.id ? cancelled : item)),
     )
     setCancellingId(null)
+    setCancelTarget(null)
 
     const notification = await notifyLine({ type: 'status', request: cancelled })
     if (notification?.ok === false || notification?.skipped) {
@@ -71,7 +72,9 @@ export function MyRequests() {
           .eq('requester_auth_user_id', session?.userId || '')
           .order('created_at', { ascending: false }),
         supabase.from('cars').select('*'),
-        supabase.from('drivers').select('id, full_name, nickname, dept, is_active, created_at'),
+        // คนขับจากระบบรวม (view driver_directory = user_profiles role='driver')
+        // สายเดียวกับที่หน้าแอดมินใช้ → ชื่อคนขับในเอกสาร แบบ ๓ ตรงกับที่แอดมินเห็น
+        supabase.from('driver_directory').select('id, full_name, nickname'),
       ])
 
       if (loadError) setError('ไม่สามารถโหลดรายการคำขอได้')
@@ -111,11 +114,11 @@ export function MyRequests() {
       <NotificationPopup open={Boolean(notice)} message={notice || ''} type="success" onClose={() => setNotice('')} />
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
-        <SummaryCard label="รอตรวจสอบ" value={summary.pending} className={STATUS.pending.className} />
-        <SummaryCard label="รอ ผอ.เขต" value={summary.tentative} className={STATUS.tentative.className} />
-        <SummaryCard label="อนุมัติแล้ว" value={summary.approved} className={STATUS.approved.className} />
-        <SummaryCard label="ไม่อนุมัติ" value={summary.rejected} className={STATUS.rejected.className} />
-        <SummaryCard label="ยกเลิกแล้ว" value={summary.cancelled} className={STATUS.cancelled.className} />
+        <SummaryCard label={`${STATUS.pending.emoji} ${STATUS.pending.short}`} value={summary.pending} className={STATUS.pending.className} />
+        <SummaryCard label={`${STATUS.tentative.emoji} ${STATUS.tentative.short}`} value={summary.tentative} className={STATUS.tentative.className} />
+        <SummaryCard label={`${STATUS.approved.emoji} ${STATUS.approved.short}`} value={summary.approved} className={STATUS.approved.className} />
+        <SummaryCard label={`${STATUS.rejected.emoji} ${STATUS.rejected.short}`} value={summary.rejected} className={STATUS.rejected.className} />
+        <SummaryCard label={`${STATUS.cancelled.emoji} ${STATUS.cancelled.short}`} value={summary.cancelled} className={STATUS.cancelled.className} />
       </div>
 
       <Card className="p-3">
@@ -134,6 +137,9 @@ export function MyRequests() {
           <div className="space-y-3">
             {requests.map((request) => {
               const approval = APPROVAL_TYPE[request.approval_type] || APPROVAL_TYPE.head_of_dept
+              const car = cars.find((c) => c.id === request.assigned_car_id)
+              const driver = drivers.find((d) => d.id === request.assigned_driver_id)
+              const driverName = driver?.full_name || request.external_driver_name || ''
               return (
                 <div key={request.id} className="rounded-xl border border-slate-200 p-4">
                   <div className="flex flex-wrap items-start justify-between gap-2">
@@ -150,39 +156,73 @@ export function MyRequests() {
                     <p>👥 ผู้โดยสาร {request.passenger_count} คน</p>
                     <p>✍️ {approval.label} ({approval.line})</p>
                   </div>
+                  {/* แถบคนขับ + รถที่จัดสรร (ถ้ามี) — ให้ผู้ขอทราบว่าใครเป็นคนขับ */}
+                  {driverName || car ? (
+                    <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-800">
+                      {driverName ? <span>🧑‍✈️ คนขับ: {driverName}</span> : null}
+                      {car ? (
+                        <span className="text-blue-600">
+                          🚐 {carTypeDisplay(car.car_type)} · {car.license_plate}
+                        </span>
+                      ) : null}
+                    </div>
+                  ) : null}
+                  {/* แถบคำอธิบายครบทั้ง 5 สถานะ — สี/คำอธิบายสอดคล้องกับ STATUS กลาง */}
+                  {request.status === 'pending' ? (
+                    <p className="mt-2 rounded-lg bg-sky-50 px-3 py-2 text-xs text-sky-700">
+                      🔍 เจ้าหน้าที่กำลังตรวจสอบความถูกต้องของคำขอ — ตรวจสอบเสร็จจะแจ้งเตือนทาง LINE
+                    </p>
+                  ) : null}
                   {request.status === 'tentative' ? (
                     <p className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-700">
-                      อยู่ระหว่างรอ ผอ.เขตลาดพร้าว ลงนามอนุมัติหนังสือ
+                      ⏳ อยู่ระหว่างรอ ผอ.เขตลาดพร้าว ลงนามอนุมัติหนังสือ
                     </p>
                   ) : null}
                   {request.status === 'approved' ? (
-                    <div className="mt-2 flex flex-wrap items-center justify-between gap-2 rounded-lg bg-emerald-50 px-3 py-2">
-                      <p className="text-xs text-emerald-700">อนุมัติเรียบร้อยและล็อกคิวรถแล้ว</p>
-                      <button
-                        type="button"
-                        onClick={() => void cancelApprovedRequest(request)}
-                        disabled={cancellingId === request.id}
-                        className="rounded-lg border border-rose-200 bg-white px-3 py-1.5 text-xs font-semibold text-rose-700 transition hover:bg-rose-50 disabled:opacity-60"
-                      >
-                        {cancellingId === request.id ? 'กำลังยกเลิก...' : 'ยกเลิกคำขอ'}
-                      </button>
-                    </div>
+                    <p className="mt-2 rounded-lg bg-emerald-50 px-3 py-2 text-xs text-emerald-700">
+                      ✅ อนุมัติเรียบร้อย — มีรถแน่นอนและล็อกคิวแล้ว
+                    </p>
+                  ) : null}
+                  {request.status === 'rejected' ? (
+                    <p className="mt-2 rounded-lg bg-rose-50 px-3 py-2 text-xs text-rose-700">
+                      🔴 คำขอนี้ไม่ผ่านการอนุมัติ — สามารถยื่นคำขอใหม่ได้ตามขั้นตอน
+                    </p>
+                  ) : null}
+                  {request.status === 'cancelled' ? (
+                    <p className="mt-2 rounded-lg border border-dashed border-slate-300 bg-slate-50 px-3 py-2 text-xs text-slate-600">
+                      🚫 คำขอนี้ถูกยกเลิกแล้ว — ยื่นคำขอใหม่ได้ตลอดเวลา
+                    </p>
                   ) : null}
                   <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-3">
                     <span className="text-xs text-slate-400 font-mono">
                       {request.doc_number || '-'}
                     </span>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const car = cars.find((c) => c.id === request.assigned_car_id)
-                        const driver = drivers.find((d) => d.id === request.assigned_driver_id)
-                        openForm3PrintWindow(request, car, driver)
-                      }}
-                      className="inline-flex items-center gap-1.5 rounded-lg bg-brand-50 px-3 py-1.5 text-xs font-semibold text-brand-700 transition hover:bg-brand-100"
-                    >
-                      📄 พิมพ์แบบ ๓ (A4)
-                    </button>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setPrintRequest({ request, car, driver })}
+                        className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-700 px-3.5 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-emerald-800"
+                      >
+                        📥 ดาวน์โหลด PDF
+                      </button>
+                      <button
+                        type="button"
+                        title="เปิดหน้าต่างพิมพ์ แบบ ๓ (A4) ในแท็บใหม่"
+                        onClick={() => openForm3PrintWindow(request, car, driver)}
+                        className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-300 bg-white px-3.5 py-2 text-xs font-bold text-emerald-700 transition hover:bg-emerald-50"
+                      >
+                        🖨️ พิมพ์
+                      </button>
+                      {request.status === 'approved' ? (
+                        <button
+                          type="button"
+                          onClick={() => setCancelTarget(request)}
+                          className="inline-flex items-center gap-1.5 rounded-xl border border-rose-300 bg-white px-3.5 py-2 text-xs font-bold text-rose-700 transition hover:bg-rose-50"
+                        >
+                          ✖ ยกเลิก
+                        </button>
+                      ) : null}
+                    </div>
                   </div>
                 </div>
               )
@@ -190,6 +230,54 @@ export function MyRequests() {
           </div>
         )}
       </Card>
+
+      {/* หน้าต่างยืนยันยกเลิกคำขอ — แทน window.confirm (ไม่มีช่องเหตุผล ไม่แตะ SQL) */}
+      <Modal
+        open={Boolean(cancelTarget)}
+        onClose={() => {
+          if (!cancellingId) setCancelTarget(null)
+        }}
+        title="ยกเลิกคำขอใช้รถหรือไม่?"
+        footer={
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => setCancelTarget(null)}
+              disabled={Boolean(cancellingId)}
+              className="flex-1 rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-50 disabled:opacity-60"
+            >
+              ปล่อยไว้ก่อน
+            </button>
+            <button
+              type="button"
+              onClick={() => cancelTarget && void cancelApprovedRequest(cancelTarget)}
+              disabled={Boolean(cancellingId)}
+              className="flex-1 rounded-xl bg-rose-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-rose-700 disabled:opacity-60"
+            >
+              {cancellingId ? 'กำลังยกเลิก...' : 'ยืนยันยกเลิกคำขอ'}
+            </button>
+          </div>
+        }
+      >
+        <div className="space-y-3">
+          <div className="flex items-start gap-3">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-rose-100 text-lg">
+              ✖️
+            </span>
+            <p className="text-sm leading-relaxed text-slate-600">
+              เมื่อยกเลิกแล้ว คิวรถจะถูกปล่อยออกทันที และระบบแจ้งเตือนทาง LINE
+              ถึงผู้ขอ คนขับที่ได้รับมอบหมาย และกลุ่มฝ่ายการศึกษา
+            </p>
+          </div>
+          <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+            <p className="font-mono text-xs text-slate-400">{cancelTarget?.doc_number || '-'}</p>
+            <p className="mt-1 text-sm font-semibold text-slate-800">📍 {cancelTarget?.destination}</p>
+            <p className="mt-1 text-xs text-slate-500">
+              📅 {formatDateTimeRange(cancelTarget?.start_datetime, cancelTarget?.end_datetime)}
+            </p>
+          </div>
+        </div>
+      </Modal>
 
       <OfficialCarFormModal
         open={Boolean(printRequest)}

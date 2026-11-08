@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   bangkokParts,
   carTypeDisplay,
@@ -34,6 +34,19 @@ export function OfficialCarFormModal({ open, onClose, request, car, driver }) {
   )
   const startParts = useMemo(() => bangkokParts(request?.start_datetime), [request?.start_datetime])
   const endParts = useMemo(() => bangkokParts(request?.end_datetime), [request?.end_datetime])
+
+  // fit-to-screen: ย่อกระดาษ A4 (210mm ≈ 794px) ให้พอดีความกว้างจอ
+  // เพื่อไม่ให้ต้องเลื่อนแนวนอนบนมือถือ — ตอนพิมพ์จริง CSS @media print คืนขนาดเต็ม
+  const [fitScale, setFitScale] = useState(1)
+  useEffect(() => {
+    const computeFit = () => {
+      const available = window.innerWidth - 24
+      setFitScale(Math.min(1, available / 794))
+    }
+    computeFit()
+    window.addEventListener('resize', computeFit)
+    return () => window.removeEventListener('resize', computeFit)
+  }, [])
 
   if (!open || !request) return null
 
@@ -150,11 +163,32 @@ export function OfficialCarFormModal({ open, onClose, request, car, driver }) {
         </div>
       </div>
 
-      {/* แผ่นกระดาษ A4 จำลอง */}
-      <div className="overflow-x-auto pb-8 print:p-0">
+      {/* คำแนะนำการใช้งาน (มือถือ → ดาวน์โหลด PDF / คอม → พิมพ์แท็บใหม่) */}
+      <div className="mx-auto mb-3 max-w-4xl rounded-xl border border-blue-200 bg-blue-50 px-4 py-2.5 text-xs leading-relaxed text-blue-800 print:hidden">
+        💡 <b>คำแนะนำ:</b> มือถือ → กด <b>📥 ดาวน์โหลด PDF</b> แล้วเปิดจากไฟล์ที่ดาวน์โหลด ·
+        คอม → กด <b>🖨️ พิมพ์เอกสาร A4</b> เปิดแท็บใหม่ได้เลย ·
+        กระดาษด้านล่างย่อพอดีจอ ไม่ต้องเลื่อนแนวนอน
+      </div>
+
+      {/* แผ่นกระดาษ A4 จำลอง — ย่อตามความกว้างจอ (fit-to-screen) */}
+      <div className="form3-fit-frame flex justify-center pb-8 print:block print:p-0"
+        style={
+          fitScale < 1
+            ? { height: `${Math.round(1122.5 * fitScale)}px`, overflow: 'hidden' }
+            : undefined
+        }
+      >
         <div
-          ref={printRef}
-          className="mx-auto bg-white text-black shadow-2xl print:shadow-none"
+          className="form3-fit-scaler"
+          style={{
+            width: '210mm',
+            transform: fitScale < 1 ? `scale(${fitScale})` : undefined,
+            transformOrigin: 'top center',
+          }}
+        >
+          <div
+            ref={printRef}
+            className="mx-auto bg-white text-black shadow-2xl print:shadow-none"
           style={{
             width: '210mm',
             height: '297mm',
@@ -362,6 +396,7 @@ export function OfficialCarFormModal({ open, onClose, request, car, driver }) {
                 </div>
               </div>
             </div>
+          </div>
           </div>
         </div>
       </div>

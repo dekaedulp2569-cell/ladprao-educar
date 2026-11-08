@@ -23,7 +23,7 @@ export const STATUS = {
     hex: '#D97706',
   },
   approved: {
-    label: 'อนุมัติแล้ว (ล็อกคิว)',
+    label: 'อนุมัติแล้ว (มีรถแน่นอน)',
     short: 'อนุมัติแล้ว',
     className: 'bg-emerald-50 text-emerald-700 border-emerald-200',
     dot: 'bg-emerald-500',

@@ -78,6 +78,18 @@ button, input, select, textarea {
   margin: 15mm 20mm 15mm 20mm;
 }
 
+/* โมดัล A4 แบบย่อพอดีจอ (fit-to-screen) — ตอนพิมพ์จริงต้องคืนขนาดเต็ม ห้ามย่อ */
+@media print {
+  .form3-fit-frame {
+    height: auto !important;
+    overflow: visible !important;
+  }
+
+  .form3-fit-scaler {
+    transform: none !important;
+  }
+}
+
 @media print {
   body {
     background-color: #ffffff !important;

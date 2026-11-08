@@ -294,8 +294,8 @@ export function AdminDashboard() {
         void notifyLine({
           type: 'status',
           request: approved,
-          statusLabel: 'อนุมัติแล้ว (ล็อกคิว)',
-          text: buildStatusMessage(approved, 'อนุมัติแล้ว (ล็อกคิว)'),
+          statusLabel: STATUS.approved.label,
+          text: buildStatusMessage(approved, STATUS.approved.label),
         })
         // 🟢 ต่อจากแจ้งผู้ขอ/กลุ่ม: ตามด้วยใบสั่งงานฉบับเต็มถ้ามีการจัดสรรคนขับไว้แล้ว
         const mission = await sendDriverMissionNotice(approved)
@@ -313,8 +313,8 @@ export function AdminDashboard() {
         void notifyLine({
           type: 'status',
           request: approved,
-          statusLabel: 'อนุมัติแล้ว (ล็อกคิว)',
-          text: buildStatusMessage(approved, 'อนุมัติแล้ว (ล็อกคิว)'),
+          statusLabel: STATUS.approved.label,
+          text: buildStatusMessage(approved, STATUS.approved.label),
         })
         // 🟢 ต่อจากแจ้งผู้ขอ/กลุ่ม: ตามด้วยใบสั่งงานฉบับเต็มถ้ามีการจัดสรรคนขับไว้แล้ว
         const mission = await sendDriverMissionNotice(approved)
@@ -1036,19 +1036,19 @@ const handleApprove = async () => {
   if (outcome.mission === true) {
     setApproveStatus({
       tone: 'green',
-      text: '✅ อนุมัติแล้ว (ล็อกคิว) • แจ้งผู้ขอ/กลุ่ม + ส่งใบสั่งงาน 🟢 ให้คนขับแล้ว',
+      text: `✅ ${STATUS.approved.label} • แจ้งผู้ขอ/กลุ่ม + ส่งใบสั่งงาน 🟢 ให้คนขับแล้ว`,
       sub: 'หน้าต่างยังเปิดอยู่ — กดปิดเมื่อพร้อม',
     })
   } else if (outcome.mission === 'error') {
     setApproveStatus({
       tone: 'amber',
-      text: 'อนุมัติแล้ว (ล็อกคิว) แต่ส่งใบสั่งงาน 🟢 ไม่สำเร็จ',
+      text: `${STATUS.approved.label} แต่ส่งใบสั่งงาน 🟢 ไม่สำเร็จ`,
       sub: `${outcome.detail || ''} • บันทึกการจัดสรรซ้ำเพื่อส่งใบสั่งงานอีกครั้งได้`,
     })
   } else {
     setApproveStatus({
       tone: 'green',
-      text: '✅ อนุมัติแล้ว (ล็อกคิว) • แจ้งผู้ขอและกลุ่มฝ่ายแล้ว',
+      text: `✅ ${STATUS.approved.label} • แจ้งผู้ขอและกลุ่มฝ่ายแล้ว`,
       sub: 'ยังไม่มีคนขับที่จัดสรร — บันทึกการจัดสรรในหน้าต่างนี้เพื่อส่งใบสั่งงาน 🟢 ให้คนขับ • หน้าต่างยังเปิดอยู่',
     })
   }

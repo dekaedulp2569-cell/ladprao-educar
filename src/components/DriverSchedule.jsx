@@ -25,8 +25,9 @@ export function DriverSchedule() {
       setError('')
 
       const driverResult = await supabase
-        .from('drivers')
-        .select('id, full_name, nickname, dept, is_active, created_at')
+        // คนขับจากระบบรวม (view driver_directory) สายเดียวกับที่ assigned_driver_id ชี้ถูกต้อง
+        .from('driver_directory')
+        .select('id, full_name, nickname')
         .eq('full_name', session?.name || '')
         .maybeSingle()
 

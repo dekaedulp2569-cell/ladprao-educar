@@ -46,19 +46,23 @@ export function PublicCalendar() {
   )
   const [requests, setRequests] = useState([])
   const [cars, setCars] = useState([])
+  const [drivers, setDrivers] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
   const load = async () => {
     setLoading(true)
     setError('')
-    const [requestResult, carResult] = await Promise.all([
+    const [requestResult, carResult, driverResult] = await Promise.all([
       supabase
         .from('public_car_calendar')
-        .select('id, status, destination, destination_province, start_datetime, end_datetime, assigned_car_id, external_car_info')
+        // selectทุกคอลัมน์ของ view — รองรับทั้งก่อน/หลังรัน migration เพิ่ม assigned_driver_id
+        .select('*')
         .in('status', ['approved', 'tentative'])
         .order('start_datetime', { ascending: true }),
       supabase.from('cars').select('*').order('created_at', { ascending: true }),
+      // ชื่อคนขับจาก view กลาง (เปิดอ่านได้ทั้งสาธารณะ/ผู้ใช้) — ถ้าล้มเหลว ปฏิทินยังใช้งานได้ปกติ
+      supabase.from('driver_directory').select('id, full_name'),
     ])
 
     if (requestResult.error || carResult.error) {
@@ -67,6 +71,7 @@ export function PublicCalendar() {
       setRequests(requestResult.data || [])
       setCars(carResult.data || [])
     }
+    setDrivers(driverResult.data || [])
     setLoading(false)
   }
 
@@ -79,6 +84,12 @@ export function PublicCalendar() {
     cars.forEach((car) => map.set(car.id, car))
     return map
   }, [cars])
+
+  const driverById = useMemo(() => {
+    const map = new Map()
+    drivers.forEach((driver) => map.set(driver.id, driver))
+    return map
+  }, [drivers])
 
   const filteredRequests = useMemo(() => {
     if (carFilter === 'all') return requests
@@ -429,6 +440,7 @@ export function PublicCalendar() {
                       <div className="space-y-2.5">
                         {groupItems.map((event) => {
                           const car = carById.get(event.assigned_car_id)
+                          const driverName = driverById.get(event.assigned_driver_id)?.full_name || ''
                           const startKey = dateKey(new Date(event.start_datetime))
                           const isContinuing = startKey < groupKey
                           return (
@@ -454,11 +466,16 @@ export function PublicCalendar() {
                                   ? ` · ⏱️ ต่อเนื่องตั้งแต่ ${formatDate(`${startKey}T12:00:00+07:00`, false)}`
                                   : ''}
                               </p>
-                              <div className="mt-2.5 flex items-center gap-2 border-t border-dashed border-slate-200 pt-2.5 text-xs font-semibold text-slate-700">
+                              <div className="mt-2.5 flex flex-wrap items-center gap-2 border-t border-dashed border-slate-200 pt-2.5 text-xs font-semibold text-slate-700">
                                 <span className="text-base">{carIcon(car?.car_type)}</span>
                                 {car
                                   ? `${carTypeDisplay(car.car_type)} · ${car.license_plate}`
                                   : event.external_car_info || 'ยังไม่ระบุรถ'}
+                                {driverName ? (
+                                  <span className="inline-flex items-center gap-1 rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-[10px] font-semibold text-blue-700">
+                                    🧑‍✈️ {driverName}
+                                  </span>
+                                ) : null}
                               </div>
                             </div>
                           )
@@ -491,6 +508,7 @@ export function PublicCalendar() {
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
             {selectedEvents.map((event) => {
               const car = carById.get(event.assigned_car_id)
+              const driverName = driverById.get(event.assigned_driver_id)?.full_name || ''
 
               return (
                 <div
@@ -525,6 +543,15 @@ export function PublicCalendar() {
                           </span>
                         </div>
                       </div>
+                      {driverName ? (
+                        <div className="flex items-start gap-2">
+                          <span className="w-5 text-center text-slate-400">🧑‍✈️</span>
+                          <div className="flex-1">
+                            <span className="font-semibold text-slate-800">{driverName}</span>
+                            <span className="ml-1 text-slate-400">(คนขับ)</span>
+                          </div>
+                        </div>
+                      ) : null}
                     </div>
                   </div>
 
