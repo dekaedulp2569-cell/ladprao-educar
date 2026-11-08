@@ -259,10 +259,12 @@ function weeklySummaryContents(
 ) {
   const cards: Record<string, unknown>[] = []
   for (const [driverName, blocks] of driverGroups) {
+    // blocks = array ของบล็อก (แต่ละบล็อก = array บรรทัด) → รวมเป็นข้อความก่อนนับ/ส่ง
+    const texts = blocks.map((lines) => lines.join('\n'))
     const pages: string[][] = []
     let current: string[] = []
     let lineCount = 0
-    for (const block of blocks) {
+    for (const block of texts) {
       const blockLines = block.split('\n').length
       if (current.length && lineCount + blockLines > 12) {
         pages.push(current)
