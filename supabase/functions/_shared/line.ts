@@ -166,6 +166,34 @@ export function formatThaiDate(value?: string | Date | null) {
   return `${parts.day} ${THAI_MONTHS_SHORT[parts.month - 1]} ${parts.year}`
 }
 
+const WEEKDAY_TH_FULL: Record<string, string> = {
+  Mon: 'วันจันทร์',
+  Tue: 'วันอังคาร',
+  Wed: 'วันพุธ',
+  Thu: 'วันพฤหัสบดี',
+  Fri: 'วันศุกร์',
+  Sat: 'วันเสาร์',
+  Sun: 'วันอาทิตย์',
+}
+
+/** วันอาทิตย์ที่ 09 พ.ย. 2569 — ใช้ในหัวข้อการ์ดสรุปรายวัน/รายสัปดาห์ */
+export function formatThaiDayDate(value?: string | Date | null) {
+  const parts = bangkokParts(value)
+  if (!parts) return '-'
+  let weekday = ''
+  try {
+    const date = value instanceof Date ? value : new Date(value)
+    const key = new Intl.DateTimeFormat('en-GB', {
+      weekday: 'short',
+      timeZone: 'Asia/Bangkok',
+    }).format(date)
+    weekday = WEEKDAY_TH_FULL[key] ? `${WEEKDAY_TH_FULL[key]}ที่ ` : ''
+  } catch {
+    weekday = ''
+  }
+  return `${weekday}${parts.day} ${THAI_MONTHS_SHORT[parts.month - 1]} ${parts.year}`
+}
+
 /** 04 พ.ย. 2569 เวลา 08:00 น. */
 export function formatThaiDateTime(value?: string | Date | null) {
   const parts = bangkokParts(value)
@@ -240,8 +268,9 @@ export function statusEmoji(status?: string | null) {
 }
 
 /**
- * แถวแบบสองช่อง: ป้ายกำกับ (หัวข้อ/ส่วนที่ไม่ใช่เนื้อหา → ตัวหนา เน้นชัด)
- * ฝั่งค่า (เนื้อหา) เป็นข้อความปกติ — ใช้ร่วมกันทุกสถานะ เพื่อให้เห็นชัดว่าแต่ละบรรทัดคืออะไร
+ * แถวแบบสองช่อง: คอลัมน์ 1 = ป้ายกำกับ (หัวข้อ ตัวหนา เน้นชัด)
+ * คอลัมน์ 2 = ค่า/รายละเอียด และกำหนดให้ **ชิดซ้าย** (align: 'start') ทุกแถว
+ * ใช้ร่วมกันทุกสถานะ เพื่อให้เห็นชัดว่าแต่ละบรรทัดคืออะไร
  */
 export function labelValueRow(
   label: string,
@@ -267,6 +296,7 @@ export function labelValueRow(
         weight: 'bold',
         color: opts?.labelColor || '#64748B',
         flex: opts?.labelFlex ?? 3,
+        align: 'start',
         wrap: true,
       },
       {
@@ -276,6 +306,7 @@ export function labelValueRow(
         weight: opts?.valueWeight || 'regular',
         color: opts?.valueColor || '#1E293B',
         flex: opts?.valueFlex ?? 7,
+        align: 'start',
         wrap: true,
       },
     ],
@@ -334,16 +365,15 @@ export type CarRequestPayload = {
 }
 
 /**
- * สร้างข้อความรายละเอียดภารกิจรถราชการ ตามแบบฟอร์มที่กำหนด (เป็นบรรทัด)
- * ใช้สำหรับสรุปงานประจำวัน และแจ้งเตือนก่อนเดินทาง
+ * สร้างข้อความรายละเอียดภารกิจรถราชการ ตามแบบฟอร์มที่กำหนด (เป็นบล็อกหลายบรรทัด)
+ * บรรทัดแรก = เวลา (ผู้เรียกต่อเลขลำดับ เช่น "1️⃣ เวลา ..." ต่อท้ายเองตามผู้รับแต่ละคน)
+ * ใช้สำหรับสรุปงานประจำวัน (การ์ดส่วนตัว)
  */
 export function buildMissionText({
-  index,
   request,
   carLabel,
   driverLabel,
 }: {
-  index: number
   request: CarRequestPayload
   carLabel?: string
   driverLabel?: string
@@ -359,14 +389,12 @@ export function buildMissionText({
   const purpose = request.purpose || '-'
 
   return [
-    `ลำดับที่ ${index}`,
     `เวลา ${start} - ${end} น.`,
-    `ปลายทาง : ${destination}`,
-    `ผู้ขอ : ${requester}`,
-    `วัตถุประสงค์ : ${purpose}`,
-    `พนักงานขับรถ : ${driver}`,
-    `ประเภทและหมายเลขทะเบียนรถ :`,
-    vehicle,
+    `📍 ${destination}`,
+    `🙋 ผู้ขอ: ${requester}`,
+    `🎯 วัตถุประสงค์: ${purpose}`,
+    `🚐 ${vehicle}`,
+    `🧑‍✈️ คนขับ: ${driver}`,
   ].join('\n')
 }
 

@@ -512,6 +512,14 @@ Deno.serve(async (req) => {
       missingRecipients.push('ผู้ขอใช้รถ (ยังไม่ได้เชื่อม LINE: ให้ผู้ขอเปิดเว็บแล้วกด "เข้าสู่ระบบด้วย LINE")')
     }
 
+    // 📢 เพิ่มผู้รับ "พนักงานขับรถ" ให้ทราบทันทีว่างานถูกยกเลิก (ไม่ต้องเตรียมรถ)
+    if (driver?.line_user_id && isValidLineId(driver.line_user_id)) {
+      if (!targets.has(driver.line_user_id)) targets.set(driver.line_user_id, 'พนักงานขับรถ')
+    } else if (request.assigned_driver_id || request.external_driver_name) {
+      const dName = driver?.full_name || request.external_driver_name || 'คนขับ'
+      missingRecipients.push(`คนขับรถ ${dName} (ยังไม่ได้เชื่อม LINE: ให้คนขับเปิดเว็บกด "เข้าสู่ระบบด้วย LINE" หรือแอดมินนำ LINE User ID มากรอกในแท็บบุคลากร)`)
+    }
+
     addRelatedRecipients(request, targets, missingRecipients)
     const notifications = await Promise.all(
       [...targets].map(async ([recipient, label]) => ({

@@ -369,7 +369,11 @@ export function AdminDashboard() {
       request: { ...request, status: 'cancelled' },
     })
     if (notification?.ok === false || notification?.skipped) {
-      setError('ยกเลิกคำขอแล้ว แต่ส่งการแจ้งเตือน LINE ไม่สำเร็จ กรุณาแจ้งกลุ่มฝ่ายด้วยตนเอง')
+      setError(
+        notification?.reason
+          ? `ยกเลิกคำขอแล้ว แต่ส่งการแจ้งเตือน LINE ไม่ครบ: ${notification.reason}`
+          : 'ยกเลิกคำขอแล้ว แต่ส่งการแจ้งเตือน LINE ไม่สำเร็จ กรุณาแจ้งกลุ่มฝ่ายด้วยตนเอง',
+      )
     }
   }
 

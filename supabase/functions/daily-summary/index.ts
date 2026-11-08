@@ -16,6 +16,7 @@ import {
   carTypeLabel,
   corsHeaders,
   formatThaiDate,
+  formatThaiDayDate,
   formatThaiTime,
   json,
   pushFlex,
@@ -65,65 +66,83 @@ function bangkokDateKey(date: Date) {
   return local.toISOString().slice(0, 10)
 }
 
-function summaryContents(title: string, lines: string[], color: string) {
-  const lineGroups: string[][] = []
-  for (let index = 0; index < lines.length; index += 96) {
-    lineGroups.push(lines.slice(index, index + 96))
-  }
-  if (!lineGroups.length) lineGroups.push([])
+/** เลขลำดับภารกิจในบล็อก: 1️⃣ 2️⃣ ... 9️⃣ และ 10. ขึ้นไป */
+function missionSeq(index: number) {
+  return index <= 9 ? `${index}\uFE0F\u20E3` : `${index}.`
+}
 
-  return lineGroups.map((lineGroup) => {
-    const cards: Record<string, unknown>[] = []
-    for (let index = 0; index < Math.max(lineGroup.length, 1); index += 8) {
-      const chunk = lineGroup.slice(index, index + 8)
-      cards.push({
-        type: 'bubble',
-        styles: { header: { backgroundColor: color } },
-        header: {
-          type: 'box',
-          layout: 'vertical',
-          contents: [
-            {
-              type: 'text',
-              text: 'EduLP Car • สรุปงานประจำวัน (15:30 น.)',
-              color: '#E0F2FE',
-              size: 'sm',
-              weight: 'bold',
-              wrap: true,
-            },
-            { type: 'text', text: title, color: '#FFFFFF', size: 'md', weight: 'bold', wrap: true },
-          ],
-        },
-        body: {
-          type: 'box',
-          layout: 'vertical',
-          spacing: 'sm',
-          contents: chunk.length
-            ? chunk.map((line) => ({
-                type: 'text',
-                text: line,
-                size: 'sm',
-                color: '#374151',
-                wrap: true,
-              }))
-            : [
-                {
-                  type: 'text',
-                  text: 'ไม่มีรายการที่ได้รับอนุมัติ',
-                  size: 'sm',
-                  color: '#4B5563',
-                  wrap: true,
-                },
-              ],
-        },
+/**
+ * การ์ดส่วนตัว (สรุปรายวัน): หัวข้อ "📅 วัน...ที่ 09 พ.ย. 2569" +
+ * บรรทัดแรกใต้หัวข้อบอกบริบทผู้รับ (งานขับรถของคุณ / คำขอใช้รถของคุณ / ...)
+ * บล็อกละ 1 ภารกิจ (หลายบรรทัดใน text เดียว) — แบ่งหน้าตามจำนวนบรรทัด
+ */
+function summaryContents(title: string, subtitle: string, blocks: string[], color: string) {
+  const pages: string[][] = []
+  let current: string[] = []
+  let lineCount = 0
+  for (const block of blocks) {
+    const blockLines = block.split('\n').length
+    if (current.length && lineCount + blockLines > 14) {
+      pages.push(current)
+      current = []
+      lineCount = 0
+    }
+    current.push(block)
+    lineCount += blockLines
+  }
+  pages.push(current)
+
+  return pages.map((page, pageIndex) => {
+    const bodyContents: Record<string, unknown>[] = []
+    if (pageIndex === 0 && subtitle) {
+      bodyContents.push({
+        type: 'text',
+        text: subtitle,
+        size: 'sm',
+        weight: 'bold',
+        color: '#0369A1',
+        wrap: true,
       })
     }
-    return cards.length === 1 ? cards[0] : { type: 'carousel', contents: cards }
+    if (page.length) {
+      for (const block of page) {
+        bodyContents.push({ type: 'text', text: block, size: 'sm', color: '#374151', wrap: true })
+      }
+    } else {
+      bodyContents.push({
+        type: 'text',
+        text: 'ไม่มีรายการที่ได้รับอนุมัติ',
+        size: 'sm',
+        color: '#4B5563',
+        wrap: true,
+      })
+    }
+    return {
+      type: 'bubble',
+      styles: { header: { backgroundColor: color } },
+      header: {
+        type: 'box',
+        layout: 'vertical',
+        contents: [
+          {
+            type: 'text',
+            text: 'EduLP Car • สรุปงานพรุ่งนี้ (15:30 น.)',
+            color: '#E0F2FE',
+            size: 'sm',
+            weight: 'bold',
+            wrap: true,
+          },
+          { type: 'text', text: title, color: '#FFFFFF', size: 'md', weight: 'bold', wrap: true },
+        ],
+      },
+      body: { type: 'box', layout: 'vertical', spacing: 'sm', contents: bodyContents },
+    }
   })
 }
 
-/** 🔵 การ์ดกลุ่มสรุป: หัวกลุ่มคนขับ+รถเน้นตัวหนาสีฟ้า, บรรทัดงานภายใต้กลุ่ม, แบ่งเป็นหลาย bubble ได้ */
-type DailyGroup = { title: string; lines: string[] }
+/** 🔵 การ์ดกลุ่มสรุป: หัวกลุ่มคนขับ (สีฟ้า) + บรรทัดรถ · เวลา ⏰ · ปลายทาง 📍 แยกบรรทัด */
+type DailyJob = { time: string; dest: string }
+type DailyGroup = { title: string; carLabel: string; jobs: DailyJob[] }
 
 function dailyGroupContents(
   title: string,
@@ -131,10 +150,21 @@ function dailyGroupContents(
   tailText: string,
   color: string,
 ) {
+  // แบ่งหน้าตามจำนวนบรรทัดประมาณการ ไม่ให้การ์ดยาวเกินไป
   const buckets: DailyGroup[][] = []
-  for (let index = 0; index < Math.max(groups.length, 1); index += 5) {
-    buckets.push(groups.slice(index, index + 5))
+  let current: DailyGroup[] = []
+  let lineEstimate = 0
+  for (const group of groups) {
+    const groupLines = 2 + Math.max(group.jobs.length, 1) * 2
+    if (current.length && lineEstimate + groupLines > 24) {
+      buckets.push(current)
+      current = []
+      lineEstimate = 0
+    }
+    current.push(group)
+    lineEstimate += groupLines
   }
+  if (current.length) buckets.push(current)
   if (!buckets.length) buckets.push([])
 
   return buckets.map((bucket, bucketIndex) => {
@@ -149,9 +179,30 @@ function dailyGroupContents(
         color: '#0369A1',
         wrap: true,
       })
-      for (const line of group.lines) {
-        rows.push({ type: 'text', text: line, size: 'xs', color: '#374151', wrap: true })
-      }
+      rows.push({
+        type: 'text',
+        text: `🚗 ${group.carLabel}`,
+        size: 'xs',
+        color: '#0369A1',
+        wrap: true,
+      })
+      group.jobs.forEach((job, jobIndex) => {
+        rows.push({
+          type: 'text',
+          text: `${jobIndex + 1}. ⏰ ${job.time}`,
+          size: 'xs',
+          weight: 'bold',
+          color: '#374151',
+          wrap: true,
+        })
+        rows.push({
+          type: 'text',
+          text: `📍 ${job.dest}`,
+          size: 'xs',
+          color: '#374151',
+          wrap: true,
+        })
+      })
     })
     if (!bucket.length) {
       rows.push({
@@ -182,7 +233,7 @@ function dailyGroupContents(
         contents: [
           {
             type: 'text',
-            text: 'EduLP Car • สรุปงานประจำวัน (15:30 น.)',
+            text: 'EduLP Car • สรุปงานพรุ่งนี้ (15:30 น.)',
             color: '#E0F2FE',
             size: 'xs',
             weight: 'bold',
@@ -196,50 +247,78 @@ function dailyGroupContents(
   })
 }
 
-function weeklySummaryContents(title: string, driverGroups: Map<string, string[]>, color: string) {
+/**
+ * 🔵 การ์ดสรุปรายสัปดาห์: หัวข้อบอก "ช่วงสัปดาห์" (วันจันทร์–อาทิตย์) +
+ * ชื่อคนขับเป็นบรรทัดแรกของเนื้อหา + บล็อกละ 1 งาน (วันเวลา / ปลายทาง / รถ)
+ * แบ่งหน้าเมื่อยาว เพื่อกันข้อความถูกตัด
+ */
+function weeklySummaryContents(
+  title: string,
+  driverGroups: Map<string, string[][]>,
+  color: string,
+) {
   const cards: Record<string, unknown>[] = []
-  for (const [driverName, lines] of driverGroups) {
-    cards.push({
-      type: 'bubble',
-      styles: { header: { backgroundColor: color } },
-      header: {
-        type: 'box',
-        layout: 'vertical',
-        contents: [
-          {
-            type: 'text',
-            text: 'EduLP Car • สรุปรายสัปดาห์ (อาทิตย์ 14:00 น.)',
-            color: '#E0F2FE',
-            size: 'sm',
-            weight: 'bold',
-            wrap: true,
-          },
-          { type: 'text', text: `🚙 ${driverName}`, color: '#FFFFFF', size: 'md', weight: 'bold', wrap: true },
-        ],
-      },
-      body: {
-        type: 'box',
-        layout: 'vertical',
-        spacing: 'sm',
-        contents: lines.length
-          ? lines.map((line) => ({
+  for (const [driverName, blocks] of driverGroups) {
+    const pages: string[][] = []
+    let current: string[] = []
+    let lineCount = 0
+    for (const block of blocks) {
+      const blockLines = block.split('\n').length
+      if (current.length && lineCount + blockLines > 12) {
+        pages.push(current)
+        current = []
+        lineCount = 0
+      }
+      current.push(block)
+      lineCount += blockLines
+    }
+    pages.push(current)
+
+    for (const page of pages) {
+      const bodyContents: Record<string, unknown>[] = [
+        {
+          type: 'text',
+          text: `🚙 ${driverName}`,
+          size: 'sm',
+          weight: 'bold',
+          color: '#0369A1',
+          wrap: true,
+        },
+      ]
+      if (page.length) {
+        for (const block of page) {
+          bodyContents.push({ type: 'text', text: block, size: 'sm', color: '#374151', wrap: true })
+        }
+      } else {
+        bodyContents.push({
+          type: 'text',
+          text: 'ไม่มีงานในสัปดาห์นี้',
+          size: 'sm',
+          color: '#4B5563',
+          wrap: true,
+        })
+      }
+      cards.push({
+        type: 'bubble',
+        styles: { header: { backgroundColor: color } },
+        header: {
+          type: 'box',
+          layout: 'vertical',
+          contents: [
+            {
               type: 'text',
-              text: line,
+              text: 'EduLP Car • สรุปรายสัปดาห์ (อาทิตย์ 14:00 น.)',
+              color: '#E0F2FE',
               size: 'sm',
-              color: '#374151',
+              weight: 'bold',
               wrap: true,
-            }))
-          : [
-              {
-                type: 'text',
-                text: 'ไม่มีงานในสัปดาห์นี้',
-                size: 'sm',
-                color: '#4B5563',
-                wrap: true,
-              },
-            ],
-      },
-    })
+            },
+            { type: 'text', text: title, color: '#FFFFFF', size: 'md', weight: 'bold', wrap: true },
+          ],
+        },
+        body: { type: 'box', layout: 'vertical', spacing: 'sm', contents: bodyContents },
+      })
+    }
   }
   return [cards.length === 1 ? cards[0] : { type: 'carousel', contents: cards }]
 }
@@ -342,9 +421,8 @@ Deno.serve(async (req) => {
 
     if (error) return json({ error: error.message }, 500)
 
-    // จัดกลุ่มงานตามคนขับ
-    const driverGroups = new Map<string, string[]>()
-    const unassignedJobs: string[] = []
+    // จัดกลุ่มงานตามคนขับ — 1 งาน = 1 บล็อก 3 บรรทัด (วัน-เวลา / ปลายทาง / รถ)
+    const driverGroups = new Map<string, string[][]>()
 
     for (let i = 0; i < (jobs || []).length; i += 1) {
       const job = jobs[i]
@@ -357,34 +435,27 @@ Deno.serve(async (req) => {
         ? `${driver.nickname ? driver.nickname + ' - ' : ''}${driver.full_name}`
         : 'ยังไม่ระบุคนขับ'
 
-      // บรรทัดย่อรายวัน: จ. 9 พ.ย.: เวลา 08:30 - 12:00 น. → ปลายทาง • รถ
       const start = formatThaiTime(job.start_datetime)
       const end = formatThaiTime(job.end_datetime)
       const destination = `${job.destination || '-'}${
         job.destination_province ? ` (${job.destination_province})` : ''
       }`
 
-      const groupKey = driverLabel
-      if (!driverGroups.has(groupKey)) {
-        driverGroups.set(groupKey, [])
-      }
-      driverGroups
-        .get(groupKey)!
-        .push(`${weekdayShort(job.start_datetime)}: เวลา ${start} - ${end} น. → ${destination} • ${carLabel}`)
+      if (!driverGroups.has(driverLabel)) driverGroups.set(driverLabel, [])
+      const blocks = driverGroups.get(driverLabel)!
+      const number = blocks.length + 1
+      blocks.push([
+        `${number}. ${weekdayShort(job.start_datetime)} • ⏰ ${start} - ${end} น.`,
+        `📍 ${destination}`,
+        `🚗 ${carLabel}`,
+      ])
     }
 
     // คนขับที่ไม่มีงานในสัปดาห์นี้ ก็ยังแสดงการ์ดว่าไม่มีงาน
-    for (const [driverId, driver] of driverById) {
+    for (const [, driver] of driverById) {
       const driverLabel = `${driver.nickname ? driver.nickname + ' - ' : ''}${driver.full_name}`
       if (!driverGroups.has(driverLabel)) {
         driverGroups.set(driverLabel, [])
-      }
-    }
-
-    // พร้อมการ์ด: ใส่เลขลำดับภารกิจของแต่ละคนขับ
-    for (const [groupKey, lines] of driverGroups) {
-      if (lines.length) {
-        driverGroups.set(groupKey, lines.map((line, index) => `${index + 1}. ${line}`))
       }
     }
 
@@ -395,7 +466,7 @@ Deno.serve(async (req) => {
     const endDayLabel = formatThaiDate(nextSunday)
 
     for (const contents of weeklySummaryContents(
-      `สรุปงานรายสัปดาห์ ${dayLabel} - ${endDayLabel}`,
+      `📅 วันจันทร์ที่ ${dayLabel} – วันอาทิตย์ที่ ${endDayLabel}`,
       driverGroups,
       SUMMARY_COLOR,
     )) {
@@ -468,7 +539,6 @@ Deno.serve(async (req) => {
     const driverLabel = driver?.full_name || job.external_driver_name || 'ยังไม่ระบุคนขับ'
 
     const missionText = buildMissionText({
-      index: i + 1,
       request: job as Record<string, unknown>,
       carLabel,
       driverLabel,
@@ -477,16 +547,17 @@ Deno.serve(async (req) => {
     // 🔵 กลุ่มสรุปสำหรับประกาศใน LINE Group: จัดกลุ่มตาม คนขับ + รถ
     const groupKey = `${driverLabel} • ${carLabel}`
     if (!groupByKey.has(groupKey)) {
-      const group: DailyGroup = { title: `🚌 ${driverLabel} — ${carLabel}`, lines: [] }
+      const group: DailyGroup = { title: `🚌 ${driverLabel}`, carLabel, jobs: [] }
       groupByKey.set(groupKey, group)
       dailyGroups.push(group)
     }
     const destination = `${job.destination || '-'}${
       job.destination_province ? ` (${job.destination_province})` : ''
     }`
-    groupByKey
-      .get(groupKey)!
-      .lines.push(`${formatThaiTime(job.start_datetime)} - ${formatThaiTime(job.end_datetime)} น. → ${destination}`)
+    groupByKey.get(groupKey)!.jobs.push({
+      time: `${formatThaiTime(job.start_datetime)} - ${formatThaiTime(job.end_datetime)} น.`,
+      dest: destination,
+    })
 
     if (driver?.line_user_id) {
       addPersonalLine(driver.line_user_id, 'งานขับรถของคุณ', missionText)
@@ -514,17 +585,19 @@ Deno.serve(async (req) => {
 
   const results: unknown[] = []
   const dayLabel = formatThaiDate(dayStart)
+  const fullDayLabel = formatThaiDayDate(dayStart)
   const lineGroupId = await resolveGroupId(supabase)
 
-  // เรียงลำดับภารกิจต่อกลุ่ม (1., 2., ...)
-  for (const group of dailyGroups) {
-    group.lines = group.lines.map((line, index) => `${index + 1}. ${line}`)
-  }
-
   for (const [lineUserId, recipient] of personal) {
+    // ใส่เลขลำดับ 1️⃣ 2️⃣ ... ตามลำดับของผู้รับแต่ละคน (คนขับ/ผู้ขอ/ผู้เกี่ยวข้อง คนละชุด)
+    const blocks = recipient.lines.map((block, index) => {
+      const [first, ...rest] = block.split('\n')
+      return [`${missionSeq(index + 1)} ${first}`, ...rest].join('\n')
+    })
     for (const contents of summaryContents(
-      `${recipient.label} • ${dayLabel}`,
-      recipient.lines,
+      `📅 ${fullDayLabel}`,
+      recipient.label,
+      blocks,
       SUMMARY_COLOR,
     )) {
       results.push(await pushFlex(lineUserId, `สรุปงานประจำวัน ${dayLabel}`, contents))
@@ -532,9 +605,9 @@ Deno.serve(async (req) => {
   }
 
   for (const contents of dailyGroupContents(
-    `ภารกิจรถราชการ • ${dayLabel}`,
+    `📅 ${fullDayLabel}`,
     dailyGroups,
-    `รวม ${jobs?.length || 0} คิว • เฉพาะคำขอ "อนุมัติแล้ว"`,
+    `✅ รวม ${jobs?.length || 0} คิว · เฉพาะคำขอที่อนุมัติแล้ว`,
     SUMMARY_COLOR,
   )) {
     results.push(
@@ -552,7 +625,7 @@ Deno.serve(async (req) => {
       date: dayKey,
       jobs: jobs?.length || 0,
       personalRecipients: personal.size,
-      groupJobs: dailyGroups.reduce((sum, group) => sum + group.lines.length, 0),
+      groupJobs: dailyGroups.reduce((sum, group) => sum + group.jobs.length, 0),
       groupConfigured: Boolean(lineGroupId),
       results,
     },
