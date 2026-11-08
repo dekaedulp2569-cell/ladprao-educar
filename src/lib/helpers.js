@@ -65,8 +65,8 @@ export const APPROVAL_TYPE = {
 }
 
 export const DOC_TYPE = {
-  school_letter: 'หนังสือขออนุญาตจากโรงเรียน',
-  dept_form: 'ใบขอใช้รถฝ่ายการศึกษา',
+  school_letter: 'หนังสือราชการจากโรงเรียนในสังกัด',
+  dept_form: 'บันทึกข้อความภายในฝ่ายการศึกษา',
 }
 
 export const ROLE = {

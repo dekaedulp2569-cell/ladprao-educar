@@ -44,6 +44,14 @@ const emptyForm = {
   related_line_user_ids: [],
 }
 
+// ⏱️ ปุ่มเวลาด่วน — ช่วงเวลามาตรฐานที่อยู่ในเวลาราชการ 08:00-16:00 น. เสมอ
+// (ตัดสินใจล็อกแล้ว: ไม่ใช้ 08:30-16:30 เพื่อไม่ให้คำขอโดนสถานะ "รอ ผอ.เขต พิจารณา" อัตโนมัติ)
+const TIME_PRESETS = [
+  { id: 'full', label: 'เต็มวันทำการ', times: '๐๘:๐๐ – ๑๖:๐๐ น.', start: '08:00', end: '16:00', full: true },
+  { id: 'am', label: 'ครึ่งวันเช้า', times: '๐๘:๐๐ – ๑๒:๐๐ น.', start: '08:00', end: '12:00' },
+  { id: 'pm', label: 'ครึ่งวันบ่าย', times: '๑๓:๐๐ – ๑๖:๐๐ น.', start: '13:00', end: '16:00' },
+]
+
 export function CarRequestForm({ onSubmitted }) {
   const { session } = useAuth()
   const [form, setForm] = useState(() => ({
@@ -65,6 +73,14 @@ export function CarRequestForm({ onSubmitted }) {
 
   const update = (field, value) => {
     setForm((current) => ({ ...current, [field]: value }))
+  }
+
+  // ⏱️ ปุ่มเวลาด่วน: ใช้วันที่จากช่องเริ่มต้นที่กรอกไว้แล้วถ้ามี มิฉะนั้นใช้วันนี้ (ไม่แตะช่องอื่น)
+  const presetTravelDate = form.start_datetime?.slice(0, 10) || dateKey(new Date())
+
+  const applyTimePreset = (preset) => {
+    update('start_datetime', `${presetTravelDate}T${preset.start}`)
+    update('end_datetime', `${presetTravelDate}T${preset.end}`)
   }
 
   const sendRequestNotification = async (request) => {
@@ -157,7 +173,7 @@ export function CarRequestForm({ onSubmitted }) {
         nextErrors.request_date = 'วันที่ยื่นคำขอไม่ถูกต้อง'
       }
     }
-    if (!form.doc_number.trim()) nextErrors.doc_number = 'ระบุเลขที่หนังสือหรือใบขอใช้รถ'
+    if (!form.doc_number.trim()) nextErrors.doc_number = 'ระบุเลขที่หนังสือราชการหรือบันทึกข้อความ'
     if (!form.requester_name.trim()) nextErrors.requester_name = 'ระบุชื่อ-สกุลผู้ขอ'
     if (!form.requester_position.trim()) nextErrors.requester_position = 'ระบุตำแหน่ง'
     if (!form.requester_department.trim()) nextErrors.requester_department = 'ระบุสังกัด'
@@ -296,7 +312,7 @@ export function CarRequestForm({ onSubmitted }) {
                 <p className="text-xs opacity-80">สถานะ</p>
                 <p className="font-semibold">
                   {(tentative ? STATUS.tentative : STATUS.pending).emoji}{' '}
-                  {tentative ? 'รอ ผอ.เขต อนุมัติ (Tentative)' : 'รอตรวจสอบ (Pending)'}
+                  {tentative ? 'รอผู้อำนวยการเขตลาดพร้าวพิจารณาอนุมัติ' : 'รอตรวจสอบ'}
                 </p>
               </div>
               <div className="rounded-xl bg-slate-50 px-4 py-3 sm:col-span-2">
@@ -372,15 +388,15 @@ export function CarRequestForm({ onSubmitted }) {
   return (
     <div className="mx-auto max-w-3xl">
       <SectionTitle
-        title="แบบฟอร์มขอใช้รถราชการ"
+        title="ยื่นคำขอใช้รถส่วนกลาง (ฝ่ายการศึกษา)"
         subtitle="กรอกข้อมูลให้ครบถ้วน ระบบจะตรวจสอบเงื่อนไขการอนุมัติให้อัตโนมัติ"
       />
 
       <form onSubmit={submit} className="space-y-5">
         <Card className="p-5 sm:p-6">
           <h3 className="mb-4 flex items-center gap-2 text-sm font-semibold text-brand-800">
-            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-brand-100 text-xs">1</span>
-            ข้อมูลเอกสาร
+            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-brand-100 text-xs">๑</span>
+            ข้อมูลเอกสารอ้างอิง
           </h3>
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="ประเภทเอกสาร" required>
@@ -393,13 +409,16 @@ export function CarRequestForm({ onSubmitted }) {
                 <option value="dept_form">{DOC_TYPE.dept_form}</option>
               </select>
             </Field>
-            <Field label="เลขที่หนังสือ / ใบขอใช้รถ" required error={errors.doc_number}>
+            <Field label="เลขที่หนังสือราชการ / บันทึกข้อความ" required error={errors.doc_number}>
               <input
                 value={form.doc_number}
                 onChange={(event) => update('doc_number', event.target.value)}
-                placeholder="เช่น ที่ กท 1234/2569"
+                placeholder="เช่น ที่ กท 5406/123"
                 className={inputClass}
               />
+              <p className="mt-1 text-xs text-slate-500">
+                หากยังไม่มีเลขที่หนังสือ (รอเลขรับ) ให้พิมพ์ - ต่อสามารถส่งคำขอได้เลย
+              </p>
             </Field>
             <Field label="วันที่ยื่นคำขอ (วัน / เดือน / พ.ศ.)" required error={errors.request_date}>
               <div className="space-y-2">
@@ -428,9 +447,10 @@ export function CarRequestForm({ onSubmitted }) {
                 className="mt-0.5 h-4 w-4 rounded border-slate-300 text-amber-600 focus:ring-amber-500"
               />
               <span>
-                <span className="block font-medium">วันหยุดนักขัตฤกษ์</span>
+                <span className="block font-medium">เดินทางในวันหยุดนักขัตฤกษ์ หรือวันหยุดราชการกรณีพิเศษ</span>
                 <span className="mt-0.5 block text-xs text-slate-500">
-                  ระบบตรวจวันเสาร์-อาทิตย์ให้อัตโนมัติ หากวันเดินทางเป็นวันหยุดนักขัตฤกษ์ให้เลือกช่องนี้
+                  ติ๊กเลือกเมื่อวันเดินทางตรงกับวันหยุด เพื่อให้ระบบเสนอ ผอ.เขตลาดพร้าว โดยอัตโนมัติ
+                  (วันเสาร์-อาทิตย์ ระบบตรวจให้เองอยู่แล้ว)
                 </span>
               </span>
             </label>
@@ -439,8 +459,8 @@ export function CarRequestForm({ onSubmitted }) {
 
         <Card className="p-5 sm:p-6">
           <h3 className="mb-4 flex items-center gap-2 text-sm font-semibold text-brand-800">
-            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-brand-100 text-xs">2</span>
-            ข้อมูลผู้ขอใช้รถ
+            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-brand-100 text-xs">๒</span>
+            ข้อมูลผู้ขอใช้รถและผู้ประสานงาน
           </h3>
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="ชื่อ-สกุล" required error={errors.requester_name}>
@@ -474,13 +494,37 @@ export function CarRequestForm({ onSubmitted }) {
                 className={inputClass}
               />
             </Field>
+            <Field label="ผู้ประสานงานระหว่างเดินทาง (กรณีไม่ใช่ผู้ขอ)">
+              <input
+                value={form.passenger_name}
+                onChange={(event) => update('passenger_name', event.target.value)}
+                className={inputClass}
+              />
+              <p className="mt-1 text-xs text-slate-500">เช่น ครูผู้ควบคุมแถว หรือเจ้าหน้าที่หน้างาน</p>
+            </Field>
+            <Field label="เบอร์โทรผู้ประสานงาน">
+              <input
+                value={form.passenger_phone}
+                onChange={(event) => update('passenger_phone', event.target.value)}
+                className={inputClass}
+              />
+            </Field>
+            <Field label="จำนวนผู้โดยสาร" required error={errors.passenger_count}>
+              <input
+                type="number"
+                min="1"
+                value={form.passenger_count}
+                onChange={(event) => update('passenger_count', event.target.value)}
+                className={inputClass}
+              />
+            </Field>
           </div>
         </Card>
 
         <Card className="p-5 sm:p-6">
           <h3 className="mb-4 flex items-center gap-2 text-sm font-semibold text-brand-800">
-            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-brand-100 text-xs">3</span>
-            รายละเอียดการเดินทาง
+            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-brand-100 text-xs">๓</span>
+            วันเวลาและเส้นทางเดินทาง
           </h3>
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="สถานที่ไปราชการ / ปลายทาง" required error={errors.destination} className="sm:col-span-2">
@@ -504,36 +548,37 @@ export function CarRequestForm({ onSubmitted }) {
                 ))}
               </datalist>
             </Field>
-            <Field label="สถานที่รับ (ต้นทาง)" required>
+            <Field label="จุดนัดรับผู้โดยสาร (ต้นทาง)" required>
               <input
                 value={form.pickup_location}
                 onChange={(event) => update('pickup_location', event.target.value)}
                 className={inputClass}
               />
+              <p className="mt-1 text-xs text-slate-500">ปกติคือสำนักงานเขตลาดพร้าว หรือชื่อโรงเรียนของท่าน</p>
             </Field>
-            <Field label="ชื่อผู้ประสานงานหน้างาน">
-              <input
-                value={form.passenger_name}
-                onChange={(event) => update('passenger_name', event.target.value)}
-                className={inputClass}
-              />
-            </Field>
-            <Field label="เบอร์โทรผู้ประสานงาน">
-              <input
-                value={form.passenger_phone}
-                onChange={(event) => update('passenger_phone', event.target.value)}
-                className={inputClass}
-              />
-            </Field>
-            <Field label="จำนวนผู้โดยสาร" required error={errors.passenger_count}>
-              <input
-                type="number"
-                min="1"
-                value={form.passenger_count}
-                onChange={(event) => update('passenger_count', event.target.value)}
-                className={inputClass}
-              />
-            </Field>
+            <div className="sm:col-span-2">
+              <p className="mb-1.5 text-sm font-medium text-slate-700">
+                ⏱️ ปุ่มเวลาด่วน
+                <span className="ml-2 text-xs font-normal text-slate-500">
+                  กดครั้งเดียวได้เวลามาตรฐานทันที ไม่ต้องกดเลือกทีละนาที
+                </span>
+              </p>
+              <div className="grid grid-cols-2 gap-2">
+                {TIME_PRESETS.map((preset) => (
+                  <button
+                    key={preset.id}
+                    type="button"
+                    onClick={() => applyTimePreset(preset)}
+                    className={`rounded-xl border border-brand-200 bg-brand-50 px-3 py-2.5 text-left transition hover:border-brand-400 hover:bg-brand-100 cursor-pointer ${
+                      preset.full ? 'col-span-2' : ''
+                    }`}
+                  >
+                    <span className="block text-xs font-semibold text-brand-800">{preset.label}</span>
+                    <span className="block text-[10.5px] font-medium text-slate-500">{preset.times}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
             <Field label="วันและเวลาเริ่มต้น" required error={errors.start_datetime}>
               <input
                 type="datetime-local"
@@ -552,9 +597,9 @@ export function CarRequestForm({ onSubmitted }) {
             </Field>
             {timeConflicts !== null ? (
               timeConflicts.length ? (
-                <div className="sm:col-span-2 rounded-xl border border-amber-200 bg-amber-50/60 p-3">
+                <div className="sm:col-span-2 rounded-xl border border-amber-200 bg-amber-50/40 p-3">
                   <p className="text-xs font-bold text-amber-800">
-                    ⚠️ ช่วงเวลานี้มีงานที่ล็อกคิวอยู่แล้ว {timeConflicts.length} งาน — อาจไม่มีรถว่าง
+                    🟠 ช่วงเวลานี้มีคิวรถที่ล็อกไปแล้ว {timeConflicts.length} งาน — ไม่เป็นไร ยังยื่นคำขอได้ตามปกติ
                   </p>
                   <ul className="mt-2 space-y-1.5">
                     {timeConflicts.map((item) => {
@@ -574,9 +619,9 @@ export function CarRequestForm({ onSubmitted }) {
                       )
                     })}
                   </ul>
-                  <p className="mt-2 text-[10.5px] leading-relaxed text-amber-700">
-                    ยังส่งคำขอได้ตามปกติ — Admin จะเห็นการซ้ำซ้อนนี้ในแผงความพร้อมของหน้าจัดสรร
-                    และจัดสรรรถว่างให้หรือประสานปรับเวลากับผู้ขอ
+                  <p className="mt-2 rounded-lg bg-amber-100/60 px-2.5 py-2 text-[11px] leading-relaxed text-amber-700">
+                    ท่านยังสามารถยื่นคำขอได้ตามปกติ — เจ้าหน้าที่จะพิจารณาจัดสรรรถว่างให้
+                    หรือประสานปรับเวลากับผู้ขออีกครั้ง โดยระบบจะแจ้งผลการจัดสรรให้ท่านผ่าน LINE
                   </p>
                 </div>
               ) : (
@@ -601,7 +646,7 @@ export function CarRequestForm({ onSubmitted }) {
 
         <Card className="p-5 sm:p-6">
           <h3 className="mb-4 flex items-center gap-2 text-sm font-semibold text-brand-800">
-            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-brand-100 text-xs">4</span>
+            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-brand-100 text-xs">๔</span>
             ผู้ที่เกี่ยวข้อง (รับแจ้งเตือน LINE)
           </h3>
           <RelatedPeoplePicker
@@ -613,27 +658,27 @@ export function CarRequestForm({ onSubmitted }) {
         <Card className={`border-2 p-5 sm:p-6 ${special ? 'border-amber-200 bg-amber-50/40' : 'border-brand-200 bg-brand-50/40'}`}>
           <h3 className="flex items-center gap-2 text-sm font-semibold text-slate-800">
             <span>{special ? '⚠️' : '✅'}</span>
-            ผลการตรวจสอบเงื่อนไขการอนุมัติ
+            ตรวจสอบความถูกต้องและเงื่อนไขการอนุมัติ
           </h3>
           {special ? (
             <div className="mt-3 space-y-2 text-sm text-amber-800">
-              <p className="font-semibold">ต้องเสนอ ผอ.เขตลาดพร้าว ลงนามอนุมัติ</p>
+              <p className="font-semibold">ต้องเสนอ ผอ.เขตลาดพร้าว พิจารณาอนุมัติ</p>
               <p className="text-xs leading-relaxed">
-                เนื่องจากอยู่นอกเวลาราชการ ออกนอกกรุงเทพมหานคร เป็นวันเสาร์-อาทิตย์
-                หรือเป็นวันหยุดนักขัตฤกษ์ ต้องเสนอ ผอ.เขตลาดพร้าวลงนามก่อน
-                จากนั้น Admin ตรวจเอกสารและอนุมัติในระบบ
+                เนื่องจากเดินทางในเวลานอกราชการ นอกพื้นที่กรุงเทพมหานคร หรือตรงกับวันหยุด
+                จึงต้องให้ ผอ.เขตลาดพร้าว ลงนามอนุมัติก่อน (ปฏิบัติราชการแทน ปลัดกรุงเทพมหานคร)
+                หลังลงนามอนุมัติแล้ว เจ้าหน้าที่จะนำคำขอเข้าจัดสรรรถให้ต่อไป
               </p>
-              <p className="text-xs">ระหว่างรอลงนาม รายการจะไม่แสดงในปฏิทินสาธารณะ</p>
+              <p className="text-xs">ระหว่างรอลงนาม รายการจะยังไม่แสดงในปฏิทินคิวรถสาธารณะ</p>
             </div>
           ) : (
             <div className="mt-3 space-y-2 text-sm text-brand-800">
-              <p className="font-semibold">หัวหน้าฝ่ายการศึกษาพิจารณาอนุมัติได้</p>
+              <p className="font-semibold">อยู่ในเงื่อนไขที่หัวหน้าฝ่ายการศึกษาพิจารณาอนุมัติได้</p>
               <p className="text-xs leading-relaxed">
-                อยู่ในเวลาราชการ 08:00-16:00 น. อยู่ในพื้นที่กรุงเทพมหานคร
-                และไม่ตรงวันเสาร์-อาทิตย์หรือวันหยุดนักขัตฤกษ์
+                เดินทางในเวลาราชการ ๐๘:๐๐–๑๖:๐๐ น. ภายในกรุงเทพมหานคร
+                และไม่เป็นวันเสาร์-อาทิตย์หรือวันหยุดนักขัตฤกษ์
                 โดยหัวหน้าฝ่ายการศึกษา ปฏิบัติราชการแทน ผอ.เขตลาดพร้าว
               </p>
-              <p className="text-xs">สถานะเริ่มต้น: รอตรวจสอบ (Pending) และล็อกคิวทันทีเมื่ออนุมัติ</p>
+              <p className="text-xs">สถานะเริ่มต้น: รอตรวจสอบ และจะล็อกคิวทันทีเมื่ออนุมัติ</p>
             </div>
           )}
         </Card>
