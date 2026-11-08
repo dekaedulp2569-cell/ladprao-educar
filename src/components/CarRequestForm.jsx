@@ -15,7 +15,6 @@ import {
   isOutOfHours,
   dateKey,
   THAI_MONTHS_LONG,
-  toThaiDigits,
   toISO,
 } from '../lib/helpers'
 import { Alert, Card, SectionTitle } from './ui'
@@ -47,9 +46,9 @@ const emptyForm = {
 // ⏱️ ปุ่มเวลาด่วน — ช่วงเวลามาตรฐานที่อยู่ในเวลาราชการ 08:00-16:00 น. เสมอ
 // (ตัดสินใจล็อกแล้ว: ไม่ใช้ 08:30-16:30 เพื่อไม่ให้คำขอโดนสถานะ "รอ ผอ.เขต พิจารณา" อัตโนมัติ)
 const TIME_PRESETS = [
-  { id: 'full', label: 'เต็มวันทำการ', times: '๐๘:๐๐ – ๑๖:๐๐ น.', start: '08:00', end: '16:00', full: true },
-  { id: 'am', label: 'ครึ่งวันเช้า', times: '๐๘:๐๐ – ๑๒:๐๐ น.', start: '08:00', end: '12:00' },
-  { id: 'pm', label: 'ครึ่งวันบ่าย', times: '๑๓:๐๐ – ๑๖:๐๐ น.', start: '13:00', end: '16:00' },
+  { id: 'full', label: 'เต็มวันทำการ', times: '08:00 – 16:00 น.', start: '08:00', end: '16:00', full: true },
+  { id: 'am', label: 'ครึ่งวันเช้า', times: '08:00 – 12:00 น.', start: '08:00', end: '12:00' },
+  { id: 'pm', label: 'ครึ่งวันบ่าย', times: '13:00 – 16:00 น.', start: '13:00', end: '16:00' },
 ]
 
 export function CarRequestForm({ onSubmitted }) {
@@ -260,7 +259,7 @@ export function CarRequestForm({ onSubmitted }) {
     const tentative = submitted.status === 'tentative'
     const [requestYear, requestMonth, requestDay] = (submitted.request_date || '').split('-').map(Number)
     const requestDateLabel = requestYear && requestMonth && requestDay
-      ? `วันที่ ${toThaiDigits(requestDay)} เดือน ${THAI_MONTHS_LONG[requestMonth - 1]} พ.ศ. ${toThaiDigits(requestYear + 543)}`
+      ? `วันที่ ${requestDay} เดือน ${THAI_MONTHS_LONG[requestMonth - 1]} พ.ศ. ${requestYear + 543}`
       : 'ไม่ระบุวันที่ยื่นคำขอ'
     const specialReasons = [
       submitted.is_out_of_bkk ? 'ออกนอกกรุงเทพมหานคร' : null,
@@ -434,7 +433,7 @@ export function CarRequestForm({ onSubmitted }) {
                     if (!year || !month || !day || !THAI_MONTHS_LONG[month - 1]) {
                       return 'เลือกวันที่ เดือน และปี พ.ศ.'
                     }
-                    return `วันที่ ${toThaiDigits(day)} เดือน ${THAI_MONTHS_LONG[month - 1]} พ.ศ. ${toThaiDigits(year + 543)}`
+                    return `วันที่ ${day} เดือน ${THAI_MONTHS_LONG[month - 1]} พ.ศ. ${year + 543}`
                   })()}
                 </p>
               </div>
@@ -674,7 +673,7 @@ export function CarRequestForm({ onSubmitted }) {
             <div className="mt-3 space-y-2 text-sm text-brand-800">
               <p className="font-semibold">อยู่ในเงื่อนไขที่หัวหน้าฝ่ายการศึกษาพิจารณาอนุมัติได้</p>
               <p className="text-xs leading-relaxed">
-                เดินทางในเวลาราชการ ๐๘:๐๐–๑๖:๐๐ น. ภายในกรุงเทพมหานคร
+                เดินทางในเวลาราชการ 08:00 – 16:00 น. ภายในกรุงเทพมหานคร
                 และไม่เป็นวันเสาร์-อาทิตย์หรือวันหยุดนักขัตฤกษ์
                 โดยหัวหน้าฝ่ายการศึกษา ปฏิบัติราชการแทน ผอ.เขตลาดพร้าว
               </p>
