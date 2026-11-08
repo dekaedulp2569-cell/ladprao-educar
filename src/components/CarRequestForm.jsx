@@ -394,7 +394,7 @@ export function CarRequestForm({ onSubmitted }) {
       <form onSubmit={submit} className="space-y-5">
         <Card className="p-5 sm:p-6">
           <h3 className="mb-4 flex items-center gap-2 text-sm font-semibold text-brand-800">
-            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-brand-100 text-xs">๑</span>
+            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-brand-100 text-xs">1</span>
             ข้อมูลเอกสารอ้างอิง
           </h3>
           <div className="grid gap-4 sm:grid-cols-2">
@@ -458,7 +458,7 @@ export function CarRequestForm({ onSubmitted }) {
 
         <Card className="p-5 sm:p-6">
           <h3 className="mb-4 flex items-center gap-2 text-sm font-semibold text-brand-800">
-            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-brand-100 text-xs">๒</span>
+            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-brand-100 text-xs">2</span>
             ข้อมูลผู้ขอใช้รถและผู้ประสานงาน
           </h3>
           <div className="grid gap-4 sm:grid-cols-2">
@@ -522,7 +522,7 @@ export function CarRequestForm({ onSubmitted }) {
 
         <Card className="p-5 sm:p-6">
           <h3 className="mb-4 flex items-center gap-2 text-sm font-semibold text-brand-800">
-            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-brand-100 text-xs">๓</span>
+            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-brand-100 text-xs">3</span>
             วันเวลาและเส้นทางเดินทาง
           </h3>
           <div className="grid gap-4 sm:grid-cols-2">
@@ -645,7 +645,7 @@ export function CarRequestForm({ onSubmitted }) {
 
         <Card className="p-5 sm:p-6">
           <h3 className="mb-4 flex items-center gap-2 text-sm font-semibold text-brand-800">
-            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-brand-100 text-xs">๔</span>
+            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-brand-100 text-xs">4</span>
             ผู้ที่เกี่ยวข้อง (รับแจ้งเตือน LINE)
           </h3>
           <RelatedPeoplePicker
